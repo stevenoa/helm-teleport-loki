@@ -1,0 +1,26 @@
+{{- if .Values.tbot.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "teleport-loki.fullname" . }}-tbot-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "teleport-loki.labels" . | nindent 4 }}
+data:
+  tbot.yaml: |
+    version: v2
+    proxy_server: {{ required "teleport.addr is required" .Values.teleport.addr }}
+    onboarding:
+      join_method: kubernetes
+      token: {{ .Values.tbot.joinTokenName }}
+    storage:
+      type: directory
+      path: /var/lib/teleport-event-handler/tbot
+    renewal_interval: {{ .Values.tbot.renewalInterval }}
+    certificate_ttl: {{ .Values.tbot.certificateTTL }}
+    outputs:
+      - type: identity
+        destination:
+          type: directory
+          path: /var/lib/teleport-event-handler/tbot-output
+{{- end }}

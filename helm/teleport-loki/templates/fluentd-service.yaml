@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "teleport-loki.fullname" . }}-fluentd
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "teleport-loki.labels" . | nindent 4 }}
+    {{- include "teleport-loki.fluentd.selectorLabels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "teleport-loki.fluentd.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http-events
+      port: {{ .Values.fluentd.port }}
+      targetPort: http-events
+      protocol: TCP

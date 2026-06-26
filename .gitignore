@@ -1,0 +1,4 @@
+loki-values.yaml
+.env
+certs/
+identity/

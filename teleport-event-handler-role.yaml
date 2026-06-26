@@ -1,0 +1,30 @@
+kind: role
+version: v5
+metadata:
+  name: teleport-event-handler
+spec:
+  options:
+    max_session_ttl: 8760h
+  allow:
+    rules:
+      - resources: ["event", "session"]
+        verbs: ["list", "read"]
+---
+kind: user
+version: v2
+metadata:
+  name: teleport-event-handler
+spec:
+  roles: ["teleport-event-handler"]
+---
+kind: role
+version: v5
+metadata:
+  name: teleport-event-handler-impersonator
+spec:
+  options:
+    max_session_ttl: 10h
+  allow:
+    impersonate:
+      users: ["teleport-event-handler"]
+      roles: ["teleport-event-handler"]

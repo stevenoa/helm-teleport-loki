@@ -1,0 +1,15 @@
+apiVersion: v2
+name: teleport-loki
+description: Streams Teleport audit events to Grafana Loki via Fluentd
+type: application
+version: 0.1.0
+appVersion: "18"
+keywords:
+  - teleport
+  - loki
+  - grafana
+  - siem
+  - fluentd
+  - audit
+maintainers:
+  - name: your-team

@@ -1,0 +1,212 @@
+# ==============================================================================
+# teleport-loki Helm chart — values.yaml
+# ==============================================================================
+
+# -- Kubernetes namespace to deploy into (created if it doesn't exist)
+namespace: teleport-loki
+
+# ------------------------------------------------------------------------------
+# Teleport connection
+# ------------------------------------------------------------------------------
+teleport:
+  # -- Teleport cluster address, e.g. your-cluster.example.com:443
+  addr: ""
+  # -- Start streaming from this cursor position (leave blank for latest)
+  startTime: ""
+
+# ------------------------------------------------------------------------------
+# Grafana Loki
+# ------------------------------------------------------------------------------
+loki:
+  # -- Loki push URL — use the gateway service if deployed via the grafana/loki chart
+  url: "http://loki-gateway.grafana.svc.cluster.local"
+  # -- Loki stream labels attached to every log line (queryable in Grafana)
+  labels:
+    job: "teleport-audit"
+
+# ------------------------------------------------------------------------------
+# TLS secret
+# Created externally by make create-tls-secret (see README).
+# ------------------------------------------------------------------------------
+secrets:
+  # -- Secret containing the Fluentd mutual-TLS files:
+  #    keys: ca.crt  client.crt  client.key  server.crt  server.key  server.key.passphrase
+  tls:
+    name: teleport-loki-tls
+  # -- Secret containing the signed Teleport identity file (only used when tbot.enabled=false)
+  identity:
+    name: teleport-loki-identity
+
+# ------------------------------------------------------------------------------
+# tbot — Teleport Machine ID sidecar (recommended)
+# Runs alongside the event-handler and auto-renews short-lived identity certs
+# using the pod's Kubernetes ServiceAccount token (no long-lived secrets).
+# Set enabled: false to use a static 1-year identity secret instead.
+# ------------------------------------------------------------------------------
+tbot:
+  enabled: true
+  image:
+    repository: public.ecr.aws/gravitational/teleport-distroless
+    tag: "18.7.6"
+    pullPolicy: IfNotPresent
+  # -- Name of the Teleport provision token (not a secret — just the token resource name in Teleport)
+  joinTokenName: "event-handler-bot-join"
+  # -- How often tbot renews the certificate (should be < certificateTTL / 2)
+  renewalInterval: "20m"
+  # -- TTL of each issued certificate
+  certificateTTL: "1h"
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+# ------------------------------------------------------------------------------
+# teleport-event-handler
+# ------------------------------------------------------------------------------
+eventHandler:
+  image:
+    repository: public.ecr.aws/gravitational/teleport-plugin-event-handler
+    tag: "18"
+    pullPolicy: IfNotPresent
+
+  # -- Number of replicas (keep at 1 — the handler maintains a streaming cursor)
+  replicaCount: 1
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+  # -- Allowlist of audit event types to forward to Loki.
+  # Empty list = forward all types (not recommended — kube.request is very high volume).
+  # This list covers security-relevant events while excluding noise
+  # (kube.request, resize, app.session.request, app.session.chunk, session.print).
+  types:
+    # Auth & certificates
+    - auth
+    - cert.create
+    # User & role management
+    - user.create
+    - user.update
+    - user.delete
+    - role.create
+    - role.update
+    - role.delete
+    # Access requests
+    - access_request.create
+    - access_request.review
+    - access_request.update
+    - access_request.delete
+    # SSH sessions
+    - session.start
+    - session.end
+    - session.join
+    - session.leave
+    - session.command
+    - session.disk
+    - session.network
+    - session.data
+    - exec
+    - port
+    # Database access
+    - db.session.start
+    - db.session.end
+    - db.session.query
+    # App access (start/end only — not app.session.request which is per-HTTP-request)
+    - app.session.start
+    - app.session.end
+    # Windows Desktop
+    - windows_desktop.session.start
+    - windows_desktop.session.end
+    # Security controls
+    - lock.create
+    - lock.delete
+    - token.create
+    - token.delete
+    # Identity connectors
+    - github.connector.create
+    - github.connector.delete
+    - oidc.connector.create
+    - oidc.connector.delete
+    - saml.connector.create
+    - saml.connector.delete
+    - trusted_cluster.create
+    - trusted_cluster.delete
+    # Machine ID / tbot
+    - bot.join
+
+  # -- Extra environment variables
+  extraEnv: []
+
+  podAnnotations: {}
+  podSecurityContext: {}
+  securityContext: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# ------------------------------------------------------------------------------
+# Fluentd
+# ------------------------------------------------------------------------------
+fluentd:
+  image:
+    repository: fluent/fluentd
+    tag: "v1.17"
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  # -- Port Fluentd listens on for incoming events from the event-handler
+  port: 24224
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+  # -- Install Loki output plugin on container start
+  plugins:
+    - fluent-plugin-grafana-loki
+
+  extraEnv: []
+  podAnnotations: {}
+  podSecurityContext: {}
+  securityContext: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+  # -- Fluentd output buffer tuning
+  buffer:
+    flushInterval: "10s"
+    chunkLimitSize: "256m"
+    queuedChunksLimitSize: 64
+    totalLimitSize: "512m"
+    retryMaxTimes: 72
+    retryWait: "1m"
+    retryMaxInterval: "1h"
+
+  # -- Persist the Fluentd file buffer across pod restarts to prevent data loss
+  persistence:
+    enabled: true
+    storageClass: ""   # leave blank to use cluster default
+    size: 2Gi
+    accessMode: ReadWriteOnce
+
+# ------------------------------------------------------------------------------
+# PersistentVolumeClaim for event-handler cursor state
+# ------------------------------------------------------------------------------
+persistence:
+  enabled: true
+  storageClass: ""   # leave blank to use cluster default
+  size: 1Gi
+  accessMode: ReadWriteOnce

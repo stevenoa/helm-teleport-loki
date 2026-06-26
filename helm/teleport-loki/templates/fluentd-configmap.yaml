@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "teleport-loki.fullname" . }}-fluentd-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "teleport-loki.labels" . | nindent 4 }}
+data:
+  fluent.conf: |
+    # -----------------------------------------------------------------------
+    # Input — receive JSON events from teleport-event-handler over HTTP
+    # -----------------------------------------------------------------------
+    <source>
+      @type http
+      port {{ .Values.fluentd.port }}
+      bind 0.0.0.0
+
+      <transport tls>
+        client_cert_auth     true
+        ca_path              /certs/ca.crt
+        cert_path            /certs/server.crt
+        private_key_path     /certs/server.key
+        private_key_passphrase "#{ENV['FLUENTD_TLS_PASSPHRASE']}"
+      </transport>
+
+      <parse>
+        @type json
+      </parse>
+    </source>
+
+    # -----------------------------------------------------------------------
+    # Output — forward to Grafana Loki
+    # -----------------------------------------------------------------------
+    <match **>
+      @type loki
+      url "{{ .Values.loki.url }}"
+      line_format json
+      {{- range $k, $v := .Values.loki.labels }}
+      <label>
+        {{ $k }} {{ $v }}
+      </label>
+      {{- end }}
+
+      <buffer>
+        @type file
+        path /fluentd/buffer/loki
+        flush_mode          interval
+        flush_interval      {{ .Values.fluentd.buffer.flushInterval }}
+        chunk_limit_size    {{ .Values.fluentd.buffer.chunkLimitSize }}
+        queued_chunks_limit_size {{ .Values.fluentd.buffer.queuedChunksLimitSize }}
+        total_limit_size    {{ .Values.fluentd.buffer.totalLimitSize }}
+        retry_max_times     {{ .Values.fluentd.buffer.retryMaxTimes }}
+        retry_wait          {{ .Values.fluentd.buffer.retryWait }}
+        retry_max_interval  {{ .Values.fluentd.buffer.retryMaxInterval }}
+        overflow_action     block
+      </buffer>
+    </match>

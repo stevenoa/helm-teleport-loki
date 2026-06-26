@@ -1,0 +1,18 @@
+{{- if .Values.fluentd.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "teleport-loki.fullname" . }}-fluentd-buffer
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "teleport-loki.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - {{ .Values.fluentd.persistence.accessMode }}
+  {{- if .Values.fluentd.persistence.storageClass }}
+  storageClassName: {{ .Values.fluentd.persistence.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.fluentd.persistence.size }}
+{{- end }}

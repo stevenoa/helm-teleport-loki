@@ -1,0 +1,156 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "teleport-loki.fullname" . }}-event-handler
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "teleport-loki.labels" . | nindent 4 }}
+    {{- include "teleport-loki.eventHandler.selectorLabels" . | nindent 4 }}
+spec:
+  # Keep exactly 1 replica — the handler maintains a streaming cursor
+  replicas: 1
+  serviceName: {{ include "teleport-loki.fullname" . }}-event-handler
+  selector:
+    matchLabels:
+      {{- include "teleport-loki.eventHandler.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/event-handler-configmap.yaml") . | sha256sum }}
+        {{- if .Values.tbot.enabled }}
+        checksum/tbot-config: {{ include (print $.Template.BasePath "/tbot-configmap.yaml") . | sha256sum }}
+        {{- end }}
+        {{- with .Values.eventHandler.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "teleport-loki.eventHandler.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "teleport-loki.fullname" . }}-event-handler
+      automountServiceAccountToken: false
+      {{- with .Values.eventHandler.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      containers:
+        - name: event-handler
+          image: "{{ .Values.eventHandler.image.repository }}:{{ .Values.eventHandler.image.tag }}"
+          imagePullPolicy: {{ .Values.eventHandler.image.pullPolicy }}
+          {{- with .Values.eventHandler.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          args:
+            - start
+            - --config=/config/teleport-event-handler.toml
+          {{- with .Values.eventHandler.extraEnv }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+            {{- if not .Values.tbot.enabled }}
+            - name: identity
+              mountPath: /identity
+              readOnly: true
+            {{- end }}
+            - name: tls
+              mountPath: /certs
+              readOnly: true
+            - name: state
+              mountPath: /var/lib/teleport-event-handler
+          resources:
+            {{- toYaml .Values.eventHandler.resources | nindent 12 }}
+
+        {{- if .Values.tbot.enabled }}
+        - name: tbot
+          image: "{{ .Values.tbot.image.repository }}:{{ .Values.tbot.image.tag }}"
+          imagePullPolicy: {{ .Values.tbot.image.pullPolicy }}
+          command:
+            - tbot
+            - start
+            - --config=/etc/tbot/tbot.yaml
+          volumeMounts:
+            - name: tbot-config
+              mountPath: /etc/tbot
+              readOnly: true
+            - name: state
+              mountPath: /var/lib/teleport-event-handler
+            - name: teleport-sa-token
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              readOnly: true
+          resources:
+            {{- toYaml .Values.tbot.resources | nindent 12 }}
+        {{- end }}
+
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "teleport-loki.fullname" . }}-handler-config
+        {{- if .Values.tbot.enabled }}
+        - name: tbot-config
+          configMap:
+            name: {{ include "teleport-loki.fullname" . }}-tbot-config
+        {{- else }}
+        - name: identity
+          secret:
+            secretName: {{ .Values.secrets.identity.name }}
+        {{- end }}
+        - name: tls
+          secret:
+            secretName: {{ .Values.secrets.tls.name }}
+        {{- if not .Values.persistence.enabled }}
+        - name: state
+          emptyDir: {}
+        {{- end }}
+        {{- if .Values.tbot.enabled }}
+        - name: teleport-sa-token
+          projected:
+            sources:
+            - serviceAccountToken:
+                audience: {{ .Values.teleport.addr | trimSuffix ":443" }}
+                expirationSeconds: 1200
+                path: token
+            - configMap:
+                name: kube-root-ca.crt
+                items:
+                - key: ca.crt
+                  path: ca.crt
+            - downwardAPI:
+                items:
+                - fieldRef:
+                    apiVersion: v1
+                    fieldPath: metadata.namespace
+                  path: namespace
+        {{- end }}
+
+      {{- with .Values.eventHandler.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.eventHandler.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.eventHandler.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+  {{- if .Values.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: state
+      spec:
+        accessModes:
+          - {{ .Values.persistence.accessMode }}
+        {{- if .Values.persistence.storageClass }}
+        storageClassName: {{ .Values.persistence.storageClass }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.persistence.size }}
+  {{- end }}

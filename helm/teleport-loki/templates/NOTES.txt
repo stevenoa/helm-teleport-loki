@@ -1,0 +1,43 @@
+===========================================================================
+  teleport-loki — deployed to namespace: {{ .Values.namespace }}
+===========================================================================
+
+  Teleport cluster : {{ .Values.teleport.addr }}
+  Fluentd service  : {{ include "teleport-loki.fullname" . }}-fluentd.{{ .Values.namespace }}.svc.cluster.local:{{ .Values.fluentd.port }}
+  Loki URL         : {{ .Values.loki.url }}
+
+---------------------------------------------------------------------------
+  Verify events are flowing
+---------------------------------------------------------------------------
+
+  # Tail event-handler logs
+  kubectl logs -n {{ .Values.namespace }} \
+    statefulset/{{ include "teleport-loki.fullname" . }}-event-handler -f
+
+  # Tail Fluentd logs
+  kubectl logs -n {{ .Values.namespace }} \
+    deployment/{{ include "teleport-loki.fullname" . }}-fluentd -f
+
+---------------------------------------------------------------------------
+  Grafana Loki log search
+---------------------------------------------------------------------------
+
+  In Grafana → Explore, select the Loki data source and run:
+
+  {job="teleport-audit"}
+
+  To filter by event type:
+  {job="teleport-audit"} | json | event_type="session.start"
+
+---------------------------------------------------------------------------
+  If events are NOT flowing, check:
+---------------------------------------------------------------------------
+
+  1. The TLS secret exists:
+       kubectl get secret -n {{ .Values.namespace }} {{ .Values.secrets.tls.name }}
+
+  2. The event-handler RBAC role is applied to your Teleport cluster:
+       tctl get role/teleport-event-handler
+
+  3. tbot is healthy (0 restarts after initial startup):
+       kubectl get pod -n {{ .Values.namespace }} {{ include "teleport-loki.fullname" . }}-event-handler-0

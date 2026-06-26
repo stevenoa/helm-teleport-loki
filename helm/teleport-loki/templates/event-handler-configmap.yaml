@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "teleport-loki.fullname" . }}-handler-config
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "teleport-loki.labels" . | nindent 4 }}
+data:
+  teleport-event-handler.toml: |
+    storage = "/var/lib/teleport-event-handler"
+    {{- if .Values.eventHandler.types }}
+    types = [{{ range $i, $t := .Values.eventHandler.types }}{{ if $i }}, {{ end }}"{{ $t }}"{{ end }}]
+    {{- end }}
+
+    [teleport]
+    addr        = "{{ required "teleport.addr is required" .Values.teleport.addr }}"
+    identity    = "/var/lib/teleport-event-handler/tbot-output/identity"
+    {{- if .Values.teleport.startTime }}
+    start_time  = "{{ .Values.teleport.startTime }}"
+    {{- end }}
+
+    [forward.fluentd]
+    url         = "https://{{ include "teleport-loki.fullname" . }}-fluentd.{{ .Values.namespace }}.svc.cluster.local:{{ .Values.fluentd.port }}"
+    session-url = "https://{{ include "teleport-loki.fullname" . }}-fluentd.{{ .Values.namespace }}.svc.cluster.local:{{ .Values.fluentd.port }}/session"
+    ca          = "/certs/ca.crt"
+    cert        = "/certs/client.crt"
+    key         = "/certs/client.key"

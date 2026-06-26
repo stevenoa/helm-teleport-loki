@@ -1,0 +1,125 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "teleport-loki.fullname" . }}-fluentd
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "teleport-loki.labels" . | nindent 4 }}
+    {{- include "teleport-loki.fluentd.selectorLabels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.fluentd.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "teleport-loki.fluentd.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        # Roll pods when the Fluentd config changes
+        checksum/config: {{ include (print $.Template.BasePath "/fluentd-configmap.yaml") . | sha256sum }}
+        {{- with .Values.fluentd.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "teleport-loki.fluentd.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.fluentd.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      # Install Fluentd output plugins before startup
+      initContainers:
+        - name: install-plugins
+          image: "{{ .Values.fluentd.image.repository }}:{{ .Values.fluentd.image.tag }}"
+          imagePullPolicy: {{ .Values.fluentd.image.pullPolicy }}
+          env:
+            - name: GEM_HOME
+              value: /usr/local/bundle
+          command:
+            - sh
+            - -c
+            - |
+              {{- range .Values.fluentd.plugins }}
+              fluent-gem install {{ . }}
+              {{- end }}
+          volumeMounts:
+            - name: gems
+              mountPath: /usr/local/bundle
+
+      containers:
+        - name: fluentd
+          image: "{{ .Values.fluentd.image.repository }}:{{ .Values.fluentd.image.tag }}"
+          imagePullPolicy: {{ .Values.fluentd.image.pullPolicy }}
+          {{- with .Values.fluentd.securityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - name: http-events
+              containerPort: {{ .Values.fluentd.port }}
+              protocol: TCP
+          env:
+            - name: GEM_HOME
+              value: /usr/local/bundle
+            - name: FLUENTD_TLS_PASSPHRASE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.tls.name }}
+                  key: server.key.passphrase
+            {{- with .Values.fluentd.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          volumeMounts:
+            - name: config
+              mountPath: /fluentd/etc/fluent.conf
+              subPath: fluent.conf
+              readOnly: true
+            - name: tls
+              mountPath: /certs
+              readOnly: true
+            - name: buffer
+              mountPath: /fluentd/buffer
+            - name: gems
+              mountPath: /usr/local/bundle
+          resources:
+            {{- toYaml .Values.fluentd.resources | nindent 12 }}
+          livenessProbe:
+            tcpSocket:
+              port: http-events
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          readinessProbe:
+            tcpSocket:
+              port: http-events
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "teleport-loki.fullname" . }}-fluentd-config
+        - name: tls
+          secret:
+            secretName: {{ .Values.secrets.tls.name }}
+        - name: buffer
+          {{- if .Values.fluentd.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "teleport-loki.fullname" . }}-fluentd-buffer
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: gems
+          emptyDir: {}
+
+      {{- with .Values.fluentd.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.fluentd.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.fluentd.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
