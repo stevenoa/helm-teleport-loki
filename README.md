@@ -363,8 +363,9 @@ and LogQL query examples for each dashboard.
 ## Makefile reference
 
 ```bash
-make setup               # first-time setup (tbot mode): certs, RBAC, bot, tls secret
-make setup-static        # first-time setup (static mode): certs, RBAC, identity, all secrets
+# First-time setup
+make setup               # tbot mode: certs, RBAC, bot, tls secret
+make setup-static        # static mode: certs, RBAC, identity, all secrets
 make setup-certs         # generate mTLS certs only (clears ./certs/ first)
 make setup-role          # apply Teleport RBAC roles only
 make setup-bot           # create Teleport bot + bootstrap token (tbot mode)
@@ -372,15 +373,21 @@ make setup-identity      # sign 1-year identity file (static mode only)
 make create-tls-secret   # load ./certs/ into k8s secret (CA + client + server certs)
 make create-identity-secret  # load ./identity/ into k8s secret (static mode only)
 
+# Helm
 make install             # helm install
 make upgrade             # helm upgrade
 make uninstall           # helm uninstall
 
+# Grafana dashboards
+make import-dashboards   # import all dashboards from dashboards/ into Grafana
+
+# Observability
 make logs                # tail all pods
 make logs-fluentd        # tail Fluentd only
 make logs-handler        # tail event-handler only
 make status              # show pods / deployments / pvcs
 
+# Cleanup
 make clean               # uninstall + delete secrets + remove certs/identity
 ```
 
