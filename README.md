@@ -108,6 +108,10 @@ sudo mv /tmp/teleport-event-handler/teleport-event-handler /usr/local/bin/telepo
 │   ├── teleport-kubernetes-access.json  # K8s sessions, exec, port forwards
 │   ├── teleport-access-requests.json    # JIT access request lifecycle
 │   └── teleport-identity-changes.json  # role, user, lock, connector changes
+├── alerts/
+│   ├── alert-rules.json                 # Grafana alert rules (identity changes, failed logins)
+│   ├── contact-points.json              # Slack contact point (webhook URL placeholder)
+│   └── notification-policy.json         # routing policy: team=security → Slack
 ├── teleport-event-handler-role.yaml
 ├── Makefile
 └── README.md
@@ -355,7 +359,7 @@ when the Fluentd config, event-handler config, or tbot config changes.
 
 ## Grafana dashboards
 
-Three pre-built dashboards are in the `dashboards/` directory:
+Four pre-built dashboards are in the `dashboards/` directory:
 
 | Dashboard | Focus |
 |---|---|
@@ -364,8 +368,34 @@ Three pre-built dashboards are in the `dashboards/` directory:
 | `teleport-access-requests.json` | JIT access request lifecycle — created, approved, denied |
 | `teleport-identity-changes.json` | Role, user, lock, and connector changes — stat panels turn red on any activity |
 
+```bash
+make import-dashboards
+```
+
 See **[dashboards/README.md](dashboards/README.md)** for import instructions, panel descriptions,
 and LogQL query examples for each dashboard.
+
+## Grafana alerting
+
+Two alert rules are in the `alerts/` directory and route to a Slack contact point:
+
+| Alert | Condition |
+|---|---|
+| Teleport Identity Changes | Any role, user, lock, connector, or trusted cluster change in a 5-minute window |
+| Teleport Failed Logins | More than 3 failed `user.login` events in a 5-minute window |
+
+Both alerts use the `team=security` label, which the included notification policy routes to
+the `teleport-slack` contact point.
+
+To import after a fresh Grafana deploy:
+
+```bash
+make import-alerts SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+```
+
+Or add `SLACK_WEBHOOK_URL=...` to your `.env` file and run `make import-alerts`.
+
+> The Slack webhook URL is substituted at import time and is never written to the repo.
 
 ## Makefile reference
 
@@ -385,8 +415,9 @@ make install             # helm install
 make upgrade             # helm upgrade
 make uninstall           # helm uninstall
 
-# Grafana dashboards
+# Grafana dashboards & alerts
 make import-dashboards   # import all dashboards from dashboards/ into Grafana
+make import-alerts       # import alert rules, contact point, and notification policy
 
 # Observability
 make logs                # tail all pods
@@ -576,5 +607,8 @@ outages.
 | `dashboards/teleport-kubernetes-access.json` | Grafana dashboard — Kubernetes access and exec activity |
 | `dashboards/teleport-access-requests.json` | Grafana dashboard — JIT access request lifecycle |
 | `dashboards/teleport-identity-changes.json` | Grafana dashboard — role, user, lock, and connector changes |
+| `alerts/alert-rules.json` | Grafana alert rules — identity changes and failed logins |
+| `alerts/contact-points.json` | Slack contact point (webhook URL stored as placeholder) |
+| `alerts/notification-policy.json` | Notification routing — `team=security` → Slack |
 | `teleport-event-handler-role.yaml` | Teleport RBAC role + user applied with `tctl` |
 | `Makefile` | Helper commands |
