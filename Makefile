@@ -4,13 +4,16 @@ CHART        := ./helm/teleport-loki
 KUBECONFIG   ?= $(HOME)/teleport-kubeconfig.yaml
 
 # Override these via env or a local .env file
-TELEPORT_ADDR ?=
-LOKI_URL      ?= http://loki-gateway.grafana.svc.cluster.local
+TELEPORT_ADDR  ?=
+LOKI_URL       ?= http://loki-gateway.grafana.svc.cluster.local
+GRAFANA_NS     ?= grafana
+GRAFANA_PASS   ?=
 
 -include .env
 
 .PHONY: help setup-certs setup-identity setup-role setup-bot \
         create-tls-secret create-identity-secret install upgrade uninstall \
+        import-dashboards \
         logs logs-fluentd logs-handler status clean
 
 help:  ## Show this help
@@ -93,6 +96,34 @@ upgrade: ## Upgrade the Helm release
 
 uninstall: ## Uninstall the Helm release
 	helm uninstall $(RELEASE) --namespace $(NAMESPACE)
+
+# ------------------------------------------------------------------------------
+# Grafana dashboards
+# ------------------------------------------------------------------------------
+
+import-dashboards: ## Import all dashboards from dashboards/ into Grafana
+	@if [ -z "$(GRAFANA_PASS)" ]; then \
+	  echo "==> Fetching Grafana admin password from secret ..."; \
+	  GRAFANA_PASS=$$(KUBECONFIG=$(KUBECONFIG) kubectl get secret -n $(GRAFANA_NS) grafana \
+	    -o jsonpath='{.data.admin-password}' | base64 -d); \
+	else \
+	  GRAFANA_PASS="$(GRAFANA_PASS)"; \
+	fi; \
+	GRAFANA_POD=$$(KUBECONFIG=$(KUBECONFIG) kubectl get pod -n $(GRAFANA_NS) \
+	  -l app.kubernetes.io/name=grafana \
+	  -o jsonpath='{.items[0].metadata.name}'); \
+	echo "==> Grafana pod: $$GRAFANA_POD"; \
+	for f in dashboards/*.json; do \
+	  name=$$(basename "$$f"); \
+	  echo "==> Importing $$name ..."; \
+	  KUBECONFIG=$(KUBECONFIG) kubectl cp "$$f" "$(GRAFANA_NS)/$$GRAFANA_POD:/tmp/$$name"; \
+	  result=$$(KUBECONFIG=$(KUBECONFIG) kubectl exec -n $(GRAFANA_NS) "$$GRAFANA_POD" -- \
+	    curl -s -X POST "http://admin:$$GRAFANA_PASS@localhost:3000/api/dashboards/db" \
+	    -H 'Content-Type: application/json' \
+	    -d "@/tmp/$$name"); \
+	  echo "$$result" | python3 -c \
+	    "import sys,json; r=json.load(sys.stdin); print('   ', r.get('status','?'), r.get('url',''))"; \
+	done
 
 # ------------------------------------------------------------------------------
 # Observability
