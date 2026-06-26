@@ -1,0 +1,120 @@
+{
+  "dashboard": {
+    "title": "Teleport Audit Events",
+    "tags": ["teleport", "audit", "security"],
+    "timezone": "browser",
+    "refresh": "30s",
+    "schemaVersion": 38,
+    "panels": [
+      {
+        "id": 1,
+        "title": "Total Events (24h)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"colorMode": "background", "graphMode": "none", "reduceOptions": {"calcs": ["sum"]}},
+        "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "blue", "value": null}]}}},
+        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(count_over_time({job=\"teleport-audit\"}[$__range]))", "queryType": "instant", "refId": "A"}]
+      },
+      {
+        "id": 2,
+        "title": "Failed Logins (24h)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"colorMode": "background", "graphMode": "none", "reduceOptions": {"calcs": ["sum"]}},
+        "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}},
+        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=`user.login` | success=`false` [$__range]))", "queryType": "instant", "refId": "A"}]
+      },
+      {
+        "id": 3,
+        "title": "Session Starts (24h)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"colorMode": "background", "graphMode": "none", "reduceOptions": {"calcs": ["sum"]}},
+        "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "blue", "value": null}]}}},
+        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=`session.start` [$__range]))", "queryType": "instant", "refId": "A"}]
+      },
+      {
+        "id": 4,
+        "title": "Access Requests (24h)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"colorMode": "background", "graphMode": "none", "reduceOptions": {"calcs": ["sum"]}},
+        "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "blue", "value": null}]}}},
+        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=~`access_request.*` [$__range]))", "queryType": "instant", "refId": "A"}]
+      },
+      {
+        "id": 5,
+        "title": "Event Rate by Type",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 4},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["sum"]}, "tooltip": {"mode": "multi"}},
+        "fieldConfig": {"defaults": {"custom": {"lineWidth": 2, "fillOpacity": 10}}},
+        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum by (event) (rate({job=\"teleport-audit\"} | json [2m]))", "legendFormat": "{{event}}", "queryType": "range", "refId": "A"}]
+      },
+      {
+        "id": 6,
+        "title": "Authentication Events",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+        "fieldConfig": {"defaults": {"custom": {"lineWidth": 2, "fillOpacity": 10}}},
+        "targets": [
+          {"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(rate({job=\"teleport-audit\"} | json | event=`user.login` | success=`true` [2m]))", "legendFormat": "login success", "queryType": "range", "refId": "A"},
+          {"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(rate({job=\"teleport-audit\"} | json | event=`user.login` | success=`false` [2m]))", "legendFormat": "login failed", "queryType": "range", "refId": "B"},
+          {"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(rate({job=\"teleport-audit\"} | json | event=`cert.create` [2m]))", "legendFormat": "cert.create", "queryType": "range", "refId": "C"}
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Sessions & Access Requests",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+        "fieldConfig": {"defaults": {"custom": {"lineWidth": 2, "fillOpacity": 10}}},
+        "targets": [
+          {"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(rate({job=\"teleport-audit\"} | json | event=`session.start` [2m]))", "legendFormat": "session.start", "queryType": "range", "refId": "A"},
+          {"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(rate({job=\"teleport-audit\"} | json | event=`session.end` [2m]))", "legendFormat": "session.end", "queryType": "range", "refId": "B"},
+          {"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(rate({job=\"teleport-audit\"} | json | event=~`access_request.*` [2m]))", "legendFormat": "access_request.*", "queryType": "range", "refId": "C"}
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Failed Logins",
+        "type": "logs",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showCommonLabels": false, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": false},
+        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "{job=\"teleport-audit\"} | json | event=`user.login` | success=`false`", "queryType": "range", "refId": "A"}]
+      },
+      {
+        "id": 9,
+        "title": "Access Requests",
+        "type": "logs",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showCommonLabels": false, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": false},
+        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "{job=\"teleport-audit\"} | json | event=~`access_request.*`", "queryType": "range", "refId": "A"}]
+      },
+      {
+        "id": 10,
+        "title": "All Audit Events",
+        "type": "logs",
+        "gridPos": {"h": 10, "w": 24, "x": 0, "y": 28},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showCommonLabels": false, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": false},
+        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "{job=\"teleport-audit\"}", "queryType": "range", "refId": "A"}]
+      }
+    ],
+    "time": {"from": "now-24h", "to": "now"},
+    "timepicker": {}
+  },
+  "overwrite": true,
+  "folderId": 0
+}
