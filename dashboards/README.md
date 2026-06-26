@@ -9,6 +9,7 @@ Pre-built Grafana dashboards for Teleport audit events stored in Grafana Loki.
 | `teleport-audit-events.json` | Teleport Audit Events | General overview — event volume, auth, sessions, access requests, full log stream |
 | `teleport-kubernetes-access.json` | Teleport — Kubernetes Access | K8s session starts/ends, exec commands, port forwards — broken down by cluster and user |
 | `teleport-access-requests.json` | Teleport — Access Requests | JIT access request lifecycle — created, approved, denied — by requester and reviewer |
+| `teleport-identity-changes.json` | Teleport — Identity Changes | Role, user, lock, connector, and trusted cluster changes — all turns red on any activity |
 
 ## Importing dashboards
 
@@ -149,6 +150,47 @@ demonstrating Teleport's just-in-time access workflow.
 
 # Requests from a specific user
 {job="teleport-audit"} | json | event="access_request.create" | user="bob@example.com"
+```
+
+---
+
+### Teleport — Identity Changes (`teleport-identity-changes.json`)
+
+Tracks all privileged configuration changes in Teleport. Every stat panel turns red on
+any activity — useful as a security monitoring view where the expected state is zero changes.
+
+**Panels:**
+
+| Panel | Type | Query |
+|---|---|---|
+| Role Changes (24h) | Stat | `... \| event=~"role\.(create\|update\|delete)"` — red if > 0 |
+| User Changes (24h) | Stat | `... \| event=~"user\.(create\|update\|delete)"` — red if > 0 |
+| Locks Created (24h) | Stat | `... \| event="lock.create"` — orange if > 0 |
+| Connector Changes (24h) | Stat | `... \| event=~"(github\|oidc\|saml)\.connector\.(create\|delete)"` — red if > 0 |
+| Identity Change Activity | Timeseries | All change types as separate series over time |
+| Role Changes by Actor | Timeseries | `sum by (user) (rate(...))` — who made role changes |
+| User Changes by Actor | Timeseries | `sum by (user) (rate(...))` — who made user changes |
+| Role Changes | Logs | Live stream of role create/update/delete events |
+| User Changes | Logs | Live stream of user create/update/delete events |
+| Locks | Logs | Live stream of lock create/delete events |
+| Connector & Trusted Cluster Changes | Logs | Live stream of connector and trusted cluster events |
+| All Identity Change Events | Logs | Full stream of all identity-related changes |
+
+**Useful ad-hoc queries for Explore:**
+
+```logql
+# All identity changes
+{job="teleport-audit"} | json | event=~"(role|user)\\.(create|update|delete)|lock\\.(create|delete)|(github|oidc|saml)\\.connector\\.(create|delete)"
+
+# Who edited which role
+{job="teleport-audit"} | json | event=~"role\\.(create|update|delete)"
+  | line_format `{{.user}} → {{.event}} on role "{{.name}}"`
+
+# All changes made by a specific user
+{job="teleport-audit"} | json | event=~"(role|user)\\.(create|update|delete)" | user="alice@example.com"
+
+# Locks only
+{job="teleport-audit"} | json | event=~"lock\\.(create|delete)"
 ```
 
 ---

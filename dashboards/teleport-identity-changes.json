@@ -1,0 +1,136 @@
+{
+  "dashboard": {
+    "title": "Teleport — Identity Changes",
+    "tags": ["teleport", "identity", "audit", "security"],
+    "timezone": "browser",
+    "refresh": "30s",
+    "schemaVersion": 38,
+    "panels": [
+      {
+        "id": 1,
+        "title": "Role Changes (24h)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"colorMode": "background", "graphMode": "none", "reduceOptions": {"calcs": ["sum"]}},
+        "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}},
+        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=~\"role\\\\.(create|update|delete)\" [$__range]))", "queryType": "instant", "refId": "A"}]
+      },
+      {
+        "id": 2,
+        "title": "User Changes (24h)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"colorMode": "background", "graphMode": "none", "reduceOptions": {"calcs": ["sum"]}},
+        "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}},
+        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=~\"user\\\\.(create|update|delete)\" [$__range]))", "queryType": "instant", "refId": "A"}]
+      },
+      {
+        "id": 3,
+        "title": "Locks Created (24h)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"colorMode": "background", "graphMode": "none", "reduceOptions": {"calcs": ["sum"]}},
+        "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "orange", "value": 1}]}}},
+        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=\"lock.create\" [$__range]))", "queryType": "instant", "refId": "A"}]
+      },
+      {
+        "id": 4,
+        "title": "Connector Changes (24h)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"colorMode": "background", "graphMode": "none", "reduceOptions": {"calcs": ["sum"]}},
+        "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}},
+        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=~\"(github|oidc|saml)\\\\.connector\\\\.(create|delete)\" [$__range]))", "queryType": "instant", "refId": "A"}]
+      },
+      {
+        "id": 5,
+        "title": "Identity Change Activity",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 4},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["sum"]}, "tooltip": {"mode": "multi"}},
+        "fieldConfig": {"defaults": {"custom": {"lineWidth": 2, "fillOpacity": 10}}},
+        "targets": [
+          {"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(rate({job=\"teleport-audit\"} | json | event=~\"role\\\\.(create|update|delete)\" [5m]))", "legendFormat": "role changes", "queryType": "range", "refId": "A"},
+          {"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(rate({job=\"teleport-audit\"} | json | event=~\"user\\\\.(create|update|delete)\" [5m]))", "legendFormat": "user changes", "queryType": "range", "refId": "B"},
+          {"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(rate({job=\"teleport-audit\"} | json | event=~\"lock\\\\.(create|delete)\" [5m]))", "legendFormat": "locks", "queryType": "range", "refId": "C"},
+          {"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(rate({job=\"teleport-audit\"} | json | event=~\"(github|oidc|saml)\\\\.connector\\\\.(create|delete)\" [5m]))", "legendFormat": "connector changes", "queryType": "range", "refId": "D"},
+          {"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(rate({job=\"teleport-audit\"} | json | event=~\"trusted_cluster\\\\.(create|delete)\" [5m]))", "legendFormat": "trusted cluster changes", "queryType": "range", "refId": "E"}
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Role Changes by Actor",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+        "fieldConfig": {"defaults": {"custom": {"lineWidth": 2, "fillOpacity": 10}}},
+        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum by (user) (rate({job=\"teleport-audit\"} | json | event=~\"role\\\\.(create|update|delete)\" [5m]))", "legendFormat": "{{user}}", "queryType": "range", "refId": "A"}]
+      },
+      {
+        "id": 7,
+        "title": "User Changes by Actor",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+        "fieldConfig": {"defaults": {"custom": {"lineWidth": 2, "fillOpacity": 10}}},
+        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum by (user) (rate({job=\"teleport-audit\"} | json | event=~\"user\\\\.(create|update|delete)\" [5m]))", "legendFormat": "{{user}}", "queryType": "range", "refId": "A"}]
+      },
+      {
+        "id": 8,
+        "title": "Role Changes",
+        "type": "logs",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showCommonLabels": false, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": false},
+        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "{job=\"teleport-audit\"} | json | event=~\"role\\\\.(create|update|delete)\"", "queryType": "range", "refId": "A"}]
+      },
+      {
+        "id": 9,
+        "title": "User Changes",
+        "type": "logs",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showCommonLabels": false, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": false},
+        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "{job=\"teleport-audit\"} | json | event=~\"user\\\\.(create|update|delete)\"", "queryType": "range", "refId": "A"}]
+      },
+      {
+        "id": 10,
+        "title": "Locks",
+        "type": "logs",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 28},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showCommonLabels": false, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": false},
+        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "{job=\"teleport-audit\"} | json | event=~\"lock\\\\.(create|delete)\"", "queryType": "range", "refId": "A"}]
+      },
+      {
+        "id": 11,
+        "title": "Connector & Trusted Cluster Changes",
+        "type": "logs",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 28},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showCommonLabels": false, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": false},
+        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "{job=\"teleport-audit\"} | json | event=~\"(github|oidc|saml)\\\\.connector\\\\.(create|delete)|trusted_cluster\\\\.(create|delete)\"", "queryType": "range", "refId": "A"}]
+      },
+      {
+        "id": 12,
+        "title": "All Identity Change Events",
+        "type": "logs",
+        "gridPos": {"h": 10, "w": 24, "x": 0, "y": 36},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showCommonLabels": false, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": false},
+        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "{job=\"teleport-audit\"} | json | event=~\"(role|user)\\\\.(create|update|delete)|lock\\\\.(create|delete)|(github|oidc|saml)\\\\.connector\\\\.(create|delete)|trusted_cluster\\\\.(create|delete)\"", "queryType": "range", "refId": "A"}]
+      }
+    ],
+    "time": {"from": "now-24h", "to": "now"},
+    "timepicker": {}
+  },
+  "overwrite": true,
+  "folderId": 0
+}

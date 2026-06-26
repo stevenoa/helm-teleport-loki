@@ -106,7 +106,8 @@ sudo mv /tmp/teleport-event-handler/teleport-event-handler /usr/local/bin/telepo
 │   ├── README.md                        # import instructions + LogQL query reference
 │   ├── teleport-audit-events.json       # general overview dashboard
 │   ├── teleport-kubernetes-access.json  # K8s sessions, exec, port forwards
-│   └── teleport-access-requests.json   # JIT access request lifecycle
+│   ├── teleport-access-requests.json    # JIT access request lifecycle
+│   └── teleport-identity-changes.json  # role, user, lock, connector changes
 ├── teleport-event-handler-role.yaml
 ├── Makefile
 └── README.md
@@ -361,6 +362,7 @@ Three pre-built dashboards are in the `dashboards/` directory:
 | `teleport-audit-events.json` | General overview — event volume, auth, sessions, full log stream |
 | `teleport-kubernetes-access.json` | K8s sessions, exec commands, port forwards by cluster and user |
 | `teleport-access-requests.json` | JIT access request lifecycle — created, approved, denied |
+| `teleport-identity-changes.json` | Role, user, lock, and connector changes — stat panels turn red on any activity |
 
 See **[dashboards/README.md](dashboards/README.md)** for import instructions, panel descriptions,
 and LogQL query examples for each dashboard.
@@ -573,5 +575,6 @@ outages.
 | `dashboards/teleport-audit-events.json` | Grafana dashboard — general audit event overview |
 | `dashboards/teleport-kubernetes-access.json` | Grafana dashboard — Kubernetes access and exec activity |
 | `dashboards/teleport-access-requests.json` | Grafana dashboard — JIT access request lifecycle |
+| `dashboards/teleport-identity-changes.json` | Grafana dashboard — role, user, lock, and connector changes |
 | `teleport-event-handler-role.yaml` | Teleport RBAC role + user applied with `tctl` |
 | `Makefile` | Helper commands |
