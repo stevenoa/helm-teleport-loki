@@ -102,6 +102,11 @@ sudo mv /tmp/teleport-event-handler/teleport-event-handler /usr/local/bin/telepo
 │           ├── event-handler-statefulset.yaml
 │           ├── serviceaccount.yaml
 │           └── NOTES.txt
+├── dashboards/
+│   ├── README.md                        # import instructions + LogQL query reference
+│   ├── teleport-audit-events.json       # general overview dashboard
+│   ├── teleport-kubernetes-access.json  # K8s sessions, exec, port forwards
+│   └── teleport-access-requests.json   # JIT access request lifecycle
 ├── teleport-event-handler-role.yaml
 ├── Makefile
 └── README.md
