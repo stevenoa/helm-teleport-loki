@@ -12,52 +12,40 @@ Pre-built Grafana dashboards for Teleport audit events stored in Grafana Loki.
 
 ## Importing dashboards
 
-All dashboards are imported the same way via the Grafana HTTP API.
-Run these commands from the repo root.
+### Using Make (recommended)
 
-### Prerequisites
-
-Get your Grafana admin password:
+From the repo root:
 
 ```bash
-kubectl get secret -n grafana grafana \
-  -o jsonpath='{.data.admin-password}' | base64 -d
+make import-dashboards
 ```
 
-Set a variable for the Grafana pod:
+This automatically fetches the Grafana admin password from the `grafana` Kubernetes Secret,
+copies each dashboard JSON into the Grafana pod, and imports it via the API. Output shows
+the status and URL for each dashboard on success.
+
+Override defaults via `.env` or environment variables if needed:
 
 ```bash
-GRAFANA_POD=$(kubectl get pod -n grafana \
+GRAFANA_NS=my-grafana-namespace make import-dashboards   # different namespace
+GRAFANA_PASS=mypassword make import-dashboards           # skip secret lookup
+```
+
+### Manual import (single dashboard)
+
+If you prefer to import one dashboard at a time:
+
+```bash
+GRAFANA_POD=$(KUBECONFIG="${HOME}/teleport-kubeconfig.yaml" kubectl get pod -n grafana \
   -l app.kubernetes.io/name=grafana \
   -o jsonpath='{.items[0].metadata.name}')
-```
 
-### Import a single dashboard
-
-```bash
 kubectl cp dashboards/<filename>.json grafana/${GRAFANA_POD}:/tmp/<filename>.json
 
 kubectl exec -n grafana ${GRAFANA_POD} -- curl -s -X POST \
   'http://admin:YOUR_PASSWORD@localhost:3000/api/dashboards/db' \
   -H 'Content-Type: application/json' \
   -d @/tmp/<filename>.json
-```
-
-### Import all dashboards at once
-
-```bash
-GRAFANA_POD=$(kubectl get pod -n grafana \
-  -l app.kubernetes.io/name=grafana \
-  -o jsonpath='{.items[0].metadata.name}')
-
-for f in dashboards/*.json; do
-  name=$(basename "$f")
-  kubectl cp "$f" "grafana/${GRAFANA_POD}:/tmp/${name}"
-  kubectl exec -n grafana "${GRAFANA_POD}" -- curl -s -X POST \
-    'http://admin:YOUR_PASSWORD@localhost:3000/api/dashboards/db' \
-    -H 'Content-Type: application/json' \
-    -d "@/tmp/${name}" | python3 -c "import sys,json; r=json.load(sys.stdin); print(r.get('status','?'), r.get('url',''))"
-done
 ```
 
 ---
