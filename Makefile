@@ -147,18 +147,25 @@ import-alerts: ## Import alert rules, contact points, and notification policy in
 	  curl -s -X POST "http://admin:$$GRAFANA_PASS@localhost:3000/api/folders" \
 	  -H 'Content-Type: application/json' \
 	  -d '{"uid":"efqce1rcnhvcwb","title":"Teleport Alerts"}' > /dev/null; \
-	echo "==> Importing contact point ..."; \
+	echo "==> Importing contact points ..."; \
 	sed "s|\$${SLACK_WEBHOOK_URL}|$(SLACK_WEBHOOK_URL)|g" alerts/contact-points.json \
 	  > /tmp/contact-points-resolved.json; \
-	KUBECONFIG=$(KUBECONFIG) kubectl cp /tmp/contact-points-resolved.json \
-	  "$(GRAFANA_NS)/$$GRAFANA_POD:/tmp/contact-points.json"; \
-	python3 -c "import json; [print(json.dumps(cp)) for cp in json.load(open('/tmp/contact-points-resolved.json'))]" \
-	  | while read cp; do \
-	    echo "$$cp" | KUBECONFIG=$(KUBECONFIG) kubectl exec -i -n $(GRAFANA_NS) "$$GRAFANA_POD" -- \
+	NCP=$$(python3 -c "import json; print(len(json.load(open('/tmp/contact-points-resolved.json'))))"); \
+	for i in $$(seq 0 $$((NCP-1))); do \
+	  uid=$$(python3 -c "import json; print(json.load(open('/tmp/contact-points-resolved.json'))[$$i]['uid'])"); \
+	  cp=$$(python3 -c "import json; print(json.dumps(json.load(open('/tmp/contact-points-resolved.json'))[$$i]))"); \
+	  result=$$(printf '%s' "$$cp" | KUBECONFIG=$(KUBECONFIG) kubectl exec -i -n $(GRAFANA_NS) "$$GRAFANA_POD" -- \
+	    curl -s -X PUT "http://admin:$$GRAFANA_PASS@localhost:3000/api/v1/provisioning/contact-points/$$uid" \
+	    -H 'Content-Type: application/json' -d @-); \
+	  if echo "$$result" | python3 -c "import sys,json; r=json.load(sys.stdin); exit(0 if 'statusCode' not in r else 1)" 2>/dev/null; then \
+	    echo "   updated: $$uid"; \
+	  else \
+	    printf '%s' "$$cp" | KUBECONFIG=$(KUBECONFIG) kubectl exec -i -n $(GRAFANA_NS) "$$GRAFANA_POD" -- \
 	      curl -s -X POST "http://admin:$$GRAFANA_PASS@localhost:3000/api/v1/provisioning/contact-points" \
 	      -H 'Content-Type: application/json' -d @- | python3 -c \
-	      "import sys,json; r=json.load(sys.stdin); print('   ', r.get('name', r.get('message','?')))"; \
-	  done; \
+	      "import sys,json; r=json.load(sys.stdin); print('   created:', r.get('name', r.get('message','?')))"; \
+	  fi; \
+	done; \
 	echo "==> Importing notification policy ..."; \
 	KUBECONFIG=$(KUBECONFIG) kubectl cp alerts/notification-policy.json \
 	  "$(GRAFANA_NS)/$$GRAFANA_POD:/tmp/notification-policy.json"; \
@@ -167,13 +174,22 @@ import-alerts: ## Import alert rules, contact points, and notification policy in
 	  -H 'Content-Type: application/json' -d @/tmp/notification-policy.json | python3 -c \
 	  "import sys,json; r=json.load(sys.stdin); print('   ', r.get('message','ok'))"; \
 	echo "==> Importing alert rules ..."; \
-	python3 -c "import json; [print(json.dumps(r)) for r in json.load(open('alerts/alert-rules.json'))]" \
-	  | while read rule; do \
-	    echo "$$rule" | KUBECONFIG=$(KUBECONFIG) kubectl exec -i -n $(GRAFANA_NS) "$$GRAFANA_POD" -- \
+	NRULES=$$(python3 -c "import json; print(len(json.load(open('alerts/alert-rules.json'))))"); \
+	for i in $$(seq 0 $$((NRULES-1))); do \
+	  uid=$$(python3 -c "import json; print(json.load(open('alerts/alert-rules.json'))[$$i]['uid'])"); \
+	  rule=$$(python3 -c "import json; print(json.dumps(json.load(open('alerts/alert-rules.json'))[$$i]))"); \
+	  result=$$(printf '%s' "$$rule" | KUBECONFIG=$(KUBECONFIG) kubectl exec -i -n $(GRAFANA_NS) "$$GRAFANA_POD" -- \
+	    curl -s -X PUT "http://admin:$$GRAFANA_PASS@localhost:3000/api/v1/provisioning/alert-rules/$$uid" \
+	    -H 'Content-Type: application/json' -d @-); \
+	  if echo "$$result" | python3 -c "import sys,json; r=json.load(sys.stdin); exit(0 if 'statusCode' not in r else 1)" 2>/dev/null; then \
+	    echo "   updated: $$(echo "$$result" | python3 -c "import sys,json; print(json.load(sys.stdin).get('title','?'))")"; \
+	  else \
+	    printf '%s' "$$rule" | KUBECONFIG=$(KUBECONFIG) kubectl exec -i -n $(GRAFANA_NS) "$$GRAFANA_POD" -- \
 	      curl -s -X POST "http://admin:$$GRAFANA_PASS@localhost:3000/api/v1/provisioning/alert-rules" \
 	      -H 'Content-Type: application/json' -d @- | python3 -c \
-	      "import sys,json; r=json.load(sys.stdin); print('   ', r.get('title', r.get('message','?')))"; \
-	  done
+	      "import sys,json; r=json.load(sys.stdin); print('   created:', r.get('title', r.get('message','?')))"; \
+	  fi; \
+	done
 
 # ------------------------------------------------------------------------------
 # Observability
