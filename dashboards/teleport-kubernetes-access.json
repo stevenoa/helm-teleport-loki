@@ -1,0 +1,117 @@
+{
+  "dashboard": {
+    "title": "Teleport — Kubernetes Access",
+    "tags": ["teleport", "kubernetes", "audit"],
+    "timezone": "browser",
+    "refresh": "30s",
+    "schemaVersion": 38,
+    "panels": [
+      {
+        "id": 1,
+        "title": "K8s Sessions Started (24h)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"colorMode": "background", "graphMode": "none", "reduceOptions": {"calcs": ["sum"]}},
+        "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "blue", "value": null}]}}},
+        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=\"session.start\" | proto=\"kube\" [$__range]))", "queryType": "instant", "refId": "A"}]
+      },
+      {
+        "id": 2,
+        "title": "Exec Commands (24h)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"colorMode": "background", "graphMode": "none", "reduceOptions": {"calcs": ["sum"]}},
+        "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "blue", "value": null}]}}},
+        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=\"exec\" [$__range]))", "queryType": "instant", "refId": "A"}]
+      },
+      {
+        "id": 3,
+        "title": "Port Forwards (24h)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"colorMode": "background", "graphMode": "none", "reduceOptions": {"calcs": ["sum"]}},
+        "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "blue", "value": null}]}}},
+        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=\"port\" [$__range]))", "queryType": "instant", "refId": "A"}]
+      },
+      {
+        "id": 4,
+        "title": "Session Ends (24h)",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"colorMode": "background", "graphMode": "none", "reduceOptions": {"calcs": ["sum"]}},
+        "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "blue", "value": null}]}}},
+        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=\"session.end\" | proto=\"kube\" [$__range]))", "queryType": "instant", "refId": "A"}]
+      },
+      {
+        "id": 5,
+        "title": "K8s Event Rate by Type",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 4},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["sum"]}, "tooltip": {"mode": "multi"}},
+        "fieldConfig": {"defaults": {"custom": {"lineWidth": 2, "fillOpacity": 10}}},
+        "targets": [
+          {"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(rate({job=\"teleport-audit\"} | json | event=\"session.start\" | proto=\"kube\" [2m]))", "legendFormat": "session.start", "queryType": "range", "refId": "A"},
+          {"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(rate({job=\"teleport-audit\"} | json | event=\"session.end\" | proto=\"kube\" [2m]))", "legendFormat": "session.end", "queryType": "range", "refId": "B"},
+          {"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(rate({job=\"teleport-audit\"} | json | event=\"exec\" [2m]))", "legendFormat": "exec", "queryType": "range", "refId": "C"},
+          {"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(rate({job=\"teleport-audit\"} | json | event=\"port\" [2m]))", "legendFormat": "port", "queryType": "range", "refId": "D"}
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Sessions by Cluster",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+        "fieldConfig": {"defaults": {"custom": {"lineWidth": 2, "fillOpacity": 10}}},
+        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum by (kubernetes_cluster) (rate({job=\"teleport-audit\"} | json | event=\"session.start\" | proto=\"kube\" [2m]))", "legendFormat": "{{kubernetes_cluster}}", "queryType": "range", "refId": "A"}]
+      },
+      {
+        "id": 7,
+        "title": "Sessions by User",
+        "type": "timeseries",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
+        "fieldConfig": {"defaults": {"custom": {"lineWidth": 2, "fillOpacity": 10}}},
+        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum by (user) (rate({job=\"teleport-audit\"} | json | event=\"session.start\" | proto=\"kube\" [2m]))", "legendFormat": "{{user}}", "queryType": "range", "refId": "A"}]
+      },
+      {
+        "id": 8,
+        "title": "Recent Exec Commands",
+        "type": "logs",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showCommonLabels": false, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": false},
+        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "{job=\"teleport-audit\"} | json | event=\"exec\"", "queryType": "range", "refId": "A"}]
+      },
+      {
+        "id": 9,
+        "title": "Recent Session Starts",
+        "type": "logs",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showCommonLabels": false, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": false},
+        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "{job=\"teleport-audit\"} | json | event=\"session.start\" | proto=\"kube\"", "queryType": "range", "refId": "A"}]
+      },
+      {
+        "id": 10,
+        "title": "All Kubernetes Events",
+        "type": "logs",
+        "gridPos": {"h": 10, "w": 24, "x": 0, "y": 28},
+        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
+        "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showCommonLabels": false, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": false},
+        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "{job=\"teleport-audit\"} | json | event=~\"session\\\\.(start|end)|exec|port\" | proto=\"kube\"", "queryType": "range", "refId": "A"}]
+      }
+    ],
+    "time": {"from": "now-24h", "to": "now"},
+    "timepicker": {}
+  },
+  "overwrite": true,
+  "folderId": 0
+}

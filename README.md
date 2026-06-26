@@ -347,125 +347,18 @@ make upgrade
 ConfigMap checksums are embedded as pod annotations, so pods roll automatically
 when the Fluentd config, event-handler config, or tbot config changes.
 
-## Grafana dashboard
+## Grafana dashboards
 
-A pre-built dashboard is included in `dashboards/teleport-audit-events.json`. Import it via the Grafana API:
+Three pre-built dashboards are in the `dashboards/` directory:
 
-```bash
-GRAFANA_POD=$(kubectl get pod -n grafana -l app.kubernetes.io/name=grafana -o jsonpath='{.items[0].metadata.name}')
+| Dashboard | Focus |
+|---|---|
+| `teleport-audit-events.json` | General overview — event volume, auth, sessions, full log stream |
+| `teleport-kubernetes-access.json` | K8s sessions, exec commands, port forwards by cluster and user |
+| `teleport-access-requests.json` | JIT access request lifecycle — created, approved, denied |
 
-kubectl cp dashboards/teleport-audit-events.json grafana/${GRAFANA_POD}:/tmp/teleport-audit-events.json
-
-kubectl exec -n grafana ${GRAFANA_POD} -- curl -s -X POST \
-  'http://admin:YOUR_GRAFANA_PASSWORD@localhost:3000/api/dashboards/db' \
-  -H 'Content-Type: application/json' \
-  -d @/tmp/teleport-audit-events.json
-```
-
-The dashboard includes:
-
-| Panel | Type | Description |
-|---|---|---|
-| Total Events (24h) | Stat | Count of all audit events in the time range |
-| Failed Logins (24h) | Stat | Count of `user.login` events with `success=false` — turns red if > 0 |
-| Session Starts (24h) | Stat | Count of `session.start` events |
-| Access Requests (24h) | Stat | Count of `access_request.*` events |
-| Event Rate by Type | Timeseries | Per-event-type rate over time |
-| Authentication Events | Timeseries | Login success/fail + cert.create over time |
-| Sessions & Access Requests | Timeseries | Session starts/ends and access requests over time |
-| Failed Logins | Logs | Live stream of failed login events |
-| Access Requests | Logs | Live stream of access request events |
-| All Audit Events | Logs | Full audit log stream |
-
-## Useful LogQL queries
-
-In Grafana → **Explore**, select the Loki data source and run any of the following.
-The `| json` parser unpacks the full Teleport event body so you can filter on any field.
-
-**All audit events**
-```logql
-{job="teleport-audit"}
-```
-
-**Filter by event type**
-```logql
-{job="teleport-audit"} | json | event=`session.start`
-```
-
-**Event rate by type (for graphs)**
-```logql
-sum by (event) (rate({job="teleport-audit"} | json [2m]))
-```
-
-**User logins (all)**
-```logql
-{job="teleport-audit"} | json | event=`user.login`
-```
-
-**Failed logins**
-```logql
-{job="teleport-audit"} | json | event=`user.login` | success=`false`
-```
-
-**Failed logins per user**
-```logql
-sum by (user) (count_over_time({job="teleport-audit"} | json | event=`user.login` | success=`false` [1h]))
-```
-
-**SSH session starts**
-```logql
-{job="teleport-audit"} | json | event=`session.start`
-```
-
-**Sessions by user**
-```logql
-sum by (user) (count_over_time({job="teleport-audit"} | json | event=`session.start` [1h]))
-```
-
-**Kubernetes exec commands**
-```logql
-{job="teleport-audit"} | json | event=`exec`
-```
-
-**Kubernetes exec by user**
-```logql
-{job="teleport-audit"} | json | event=`exec` | line_format `{{.user}} → {{.command}} on {{.kubernetes_pod_name}}`
-```
-
-**Access requests (create + review)**
-```logql
-{job="teleport-audit"} | json | event=~`access_request\.(create|review)`
-```
-
-**Certificate creations (bots + users)**
-```logql
-{job="teleport-audit"} | json | event=`cert.create`
-```
-
-**Bot joins**
-```logql
-{job="teleport-audit"} | json | event=`bot.join`
-```
-
-**Role or user changes**
-```logql
-{job="teleport-audit"} | json | event=~`(role|user)\.(create|update|delete)`
-```
-
-**Lock creations (potential incident response)**
-```logql
-{job="teleport-audit"} | json | event=`lock.create`
-```
-
-**Events from a specific user**
-```logql
-{job="teleport-audit"} | json | user=`alice@example.com`
-```
-
-**Events from a specific Kubernetes namespace**
-```logql
-{job="teleport-audit"} | json | kubernetes_pod_namespace=`production`
-```
+See **[dashboards/README.md](dashboards/README.md)** for import instructions, panel descriptions,
+and LogQL query examples for each dashboard.
 
 ## Makefile reference
 
@@ -664,6 +557,9 @@ outages.
 | `helm/teleport-loki/templates/fluentd-deployment.yaml` | Fluentd workload (GEM_HOME fix, tcpSocket probes, PVC buffer) |
 | `helm/teleport-loki/templates/fluentd-buffer-pvc.yaml` | PVC for the Fluentd file buffer (survives restarts) |
 | `helm/teleport-loki/templates/fluentd-service.yaml` | ClusterIP service for Fluentd |
-| `dashboards/teleport-audit-events.json` | Pre-built Grafana dashboard — import via API (see above) |
+| `dashboards/README.md` | Dashboard import instructions and LogQL query reference |
+| `dashboards/teleport-audit-events.json` | Grafana dashboard — general audit event overview |
+| `dashboards/teleport-kubernetes-access.json` | Grafana dashboard — Kubernetes access and exec activity |
+| `dashboards/teleport-access-requests.json` | Grafana dashboard — JIT access request lifecycle |
 | `teleport-event-handler-role.yaml` | Teleport RBAC role + user applied with `tctl` |
 | `Makefile` | Helper commands |
