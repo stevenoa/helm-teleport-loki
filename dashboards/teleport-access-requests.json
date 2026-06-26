@@ -1,7 +1,11 @@
 {
   "dashboard": {
-    "title": "Teleport — Access Requests",
-    "tags": ["teleport", "access-requests", "audit"],
+    "title": "Teleport \u2014 Access Requests",
+    "tags": [
+      "teleport",
+      "access-requests",
+      "audit"
+    ],
     "timezone": "browser",
     "refresh": "30s",
     "schemaVersion": 38,
@@ -10,106 +14,476 @@
         "id": 1,
         "title": "Requests Created (24h)",
         "type": "stat",
-        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
-        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
-        "options": {"colorMode": "background", "graphMode": "none", "reduceOptions": {"calcs": ["sum"]}},
-        "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "blue", "value": null}]}}},
-        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=\"access_request.create\" [$__range]))", "queryType": "instant", "refId": "A"}]
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 0,
+          "y": 0
+        },
+        "datasource": {
+          "type": "loki",
+          "uid": "afqc1lplux9fka"
+        },
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "reduceOptions": {
+            "calcs": [
+              "sum"
+            ]
+          }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "blue",
+                  "value": null
+                }
+              ]
+            }
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "loki",
+              "uid": "afqc1lplux9fka"
+            },
+            "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=\"access_request.create\" [$__range]))",
+            "queryType": "instant",
+            "refId": "A"
+          }
+        ]
       },
       {
         "id": 2,
         "title": "Approved (24h)",
         "type": "stat",
-        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
-        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
-        "options": {"colorMode": "background", "graphMode": "none", "reduceOptions": {"calcs": ["sum"]}},
-        "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "green", "value": null}]}}},
-        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=\"access_request.review\" | state=\"APPROVED\" [$__range]))", "queryType": "instant", "refId": "A"}]
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 6,
+          "y": 0
+        },
+        "datasource": {
+          "type": "loki",
+          "uid": "afqc1lplux9fka"
+        },
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "reduceOptions": {
+            "calcs": [
+              "sum"
+            ]
+          }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                }
+              ]
+            }
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "loki",
+              "uid": "afqc1lplux9fka"
+            },
+            "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=\"access_request.review\" | state=\"APPROVED\" [$__range]))",
+            "queryType": "instant",
+            "refId": "A"
+          }
+        ]
       },
       {
         "id": 3,
         "title": "Denied (24h)",
         "type": "stat",
-        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
-        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
-        "options": {"colorMode": "background", "graphMode": "none", "reduceOptions": {"calcs": ["sum"]}},
-        "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}},
-        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=\"access_request.review\" | state=\"DENIED\" [$__range]))", "queryType": "instant", "refId": "A"}]
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 12,
+          "y": 0
+        },
+        "datasource": {
+          "type": "loki",
+          "uid": "afqc1lplux9fka"
+        },
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "reduceOptions": {
+            "calcs": [
+              "sum"
+            ]
+          }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "green",
+                  "value": null
+                },
+                {
+                  "color": "red",
+                  "value": 1
+                }
+              ]
+            }
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "loki",
+              "uid": "afqc1lplux9fka"
+            },
+            "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=\"access_request.review\" | state=\"DENIED\" [$__range]))",
+            "queryType": "instant",
+            "refId": "A"
+          }
+        ]
       },
       {
         "id": 4,
         "title": "Total Reviews (24h)",
         "type": "stat",
-        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
-        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
-        "options": {"colorMode": "background", "graphMode": "none", "reduceOptions": {"calcs": ["sum"]}},
-        "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"steps": [{"color": "blue", "value": null}]}}},
-        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=\"access_request.review\" [$__range]))", "queryType": "instant", "refId": "A"}]
+        "gridPos": {
+          "h": 4,
+          "w": 6,
+          "x": 18,
+          "y": 0
+        },
+        "datasource": {
+          "type": "loki",
+          "uid": "afqc1lplux9fka"
+        },
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "reduceOptions": {
+            "calcs": [
+              "sum"
+            ]
+          }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": {
+              "mode": "thresholds"
+            },
+            "thresholds": {
+              "steps": [
+                {
+                  "color": "blue",
+                  "value": null
+                }
+              ]
+            }
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "loki",
+              "uid": "afqc1lplux9fka"
+            },
+            "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=\"access_request.review\" [$__range]))",
+            "queryType": "instant",
+            "refId": "A"
+          }
+        ]
       },
       {
         "id": 5,
         "title": "Request Activity Over Time",
         "type": "timeseries",
-        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 4},
-        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
-        "options": {"legend": {"displayMode": "table", "placement": "right", "calcs": ["sum"]}, "tooltip": {"mode": "multi"}},
-        "fieldConfig": {"defaults": {"custom": {"lineWidth": 2, "fillOpacity": 10}}},
+        "gridPos": {
+          "h": 8,
+          "w": 24,
+          "x": 0,
+          "y": 4
+        },
+        "datasource": {
+          "type": "loki",
+          "uid": "afqc1lplux9fka"
+        },
+        "options": {
+          "legend": {
+            "displayMode": "table",
+            "placement": "right",
+            "calcs": [
+              "sum"
+            ]
+          },
+          "tooltip": {
+            "mode": "multi"
+          }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10
+            }
+          }
+        },
         "targets": [
-          {"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(rate({job=\"teleport-audit\"} | json | event=\"access_request.create\" [2m]))", "legendFormat": "created", "queryType": "range", "refId": "A"},
-          {"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(rate({job=\"teleport-audit\"} | json | event=\"access_request.review\" | state=\"APPROVED\" [2m]))", "legendFormat": "approved", "queryType": "range", "refId": "B"},
-          {"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum(rate({job=\"teleport-audit\"} | json | event=\"access_request.review\" | state=\"DENIED\" [2m]))", "legendFormat": "denied", "queryType": "range", "refId": "C"}
+          {
+            "datasource": {
+              "type": "loki",
+              "uid": "afqc1lplux9fka"
+            },
+            "expr": "sum(rate({job=\"teleport-audit\"} | json | event=\"access_request.create\" [2m]))",
+            "legendFormat": "created",
+            "queryType": "range",
+            "refId": "A"
+          },
+          {
+            "datasource": {
+              "type": "loki",
+              "uid": "afqc1lplux9fka"
+            },
+            "expr": "sum(rate({job=\"teleport-audit\"} | json | event=\"access_request.review\" | state=\"APPROVED\" [2m]))",
+            "legendFormat": "approved",
+            "queryType": "range",
+            "refId": "B"
+          },
+          {
+            "datasource": {
+              "type": "loki",
+              "uid": "afqc1lplux9fka"
+            },
+            "expr": "sum(rate({job=\"teleport-audit\"} | json | event=\"access_request.review\" | state=\"DENIED\" [2m]))",
+            "legendFormat": "denied",
+            "queryType": "range",
+            "refId": "C"
+          }
         ]
       },
       {
         "id": 6,
         "title": "Requests by Requester",
         "type": "timeseries",
-        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
-        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
-        "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
-        "fieldConfig": {"defaults": {"custom": {"lineWidth": 2, "fillOpacity": 10}}},
-        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum by (user) (rate({job=\"teleport-audit\"} | json | event=\"access_request.create\" [2m]))", "legendFormat": "{{user}}", "queryType": "range", "refId": "A"}]
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 12
+        },
+        "datasource": {
+          "type": "loki",
+          "uid": "afqc1lplux9fka"
+        },
+        "options": {
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "multi"
+          }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10
+            }
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "loki",
+              "uid": "afqc1lplux9fka"
+            },
+            "expr": "sum by (user) (rate({job=\"teleport-audit\"} | json | event=\"access_request.create\" [2m]))",
+            "legendFormat": "{{user}}",
+            "queryType": "range",
+            "refId": "A"
+          }
+        ]
       },
       {
         "id": 7,
         "title": "Reviews by Reviewer",
         "type": "timeseries",
-        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 12},
-        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
-        "options": {"legend": {"displayMode": "list", "placement": "bottom"}, "tooltip": {"mode": "multi"}},
-        "fieldConfig": {"defaults": {"custom": {"lineWidth": 2, "fillOpacity": 10}}},
-        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "sum by (reviewer) (rate({job=\"teleport-audit\"} | json | event=\"access_request.review\" [2m]))", "legendFormat": "{{reviewer}}", "queryType": "range", "refId": "A"}]
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 12
+        },
+        "datasource": {
+          "type": "loki",
+          "uid": "afqc1lplux9fka"
+        },
+        "options": {
+          "legend": {
+            "displayMode": "list",
+            "placement": "bottom"
+          },
+          "tooltip": {
+            "mode": "multi"
+          }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "custom": {
+              "lineWidth": 2,
+              "fillOpacity": 10
+            }
+          }
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "loki",
+              "uid": "afqc1lplux9fka"
+            },
+            "expr": "sum by (reviewer) (rate({job=\"teleport-audit\"} | json | event=\"access_request.review\" [2m]))",
+            "legendFormat": "{{reviewer}}",
+            "queryType": "range",
+            "refId": "A"
+          }
+        ]
       },
       {
         "id": 8,
         "title": "Recent Requests Created",
         "type": "logs",
-        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
-        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
-        "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showCommonLabels": false, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": false},
-        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "{job=\"teleport-audit\"} | json | event=\"access_request.create\"", "queryType": "range", "refId": "A"}]
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 0,
+          "y": 20
+        },
+        "datasource": {
+          "type": "loki",
+          "uid": "afqc1lplux9fka"
+        },
+        "options": {
+          "dedupStrategy": "none",
+          "enableLogDetails": true,
+          "prettifyLogMessage": true,
+          "showCommonLabels": false,
+          "showLabels": false,
+          "showTime": true,
+          "sortOrder": "Descending",
+          "wrapLogMessage": false
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "loki",
+              "uid": "afqc1lplux9fka"
+            },
+            "expr": "{job=\"teleport-audit\"} | json | event=\"access_request.create\"",
+            "queryType": "range",
+            "refId": "A"
+          }
+        ]
       },
       {
         "id": 9,
         "title": "Recent Reviews",
         "type": "logs",
-        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
-        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
-        "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showCommonLabels": false, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": false},
-        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "{job=\"teleport-audit\"} | json | event=\"access_request.review\"", "queryType": "range", "refId": "A"}]
+        "gridPos": {
+          "h": 8,
+          "w": 12,
+          "x": 12,
+          "y": 20
+        },
+        "datasource": {
+          "type": "loki",
+          "uid": "afqc1lplux9fka"
+        },
+        "options": {
+          "dedupStrategy": "none",
+          "enableLogDetails": true,
+          "prettifyLogMessage": true,
+          "showCommonLabels": false,
+          "showLabels": false,
+          "showTime": true,
+          "sortOrder": "Descending",
+          "wrapLogMessage": false
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "loki",
+              "uid": "afqc1lplux9fka"
+            },
+            "expr": "{job=\"teleport-audit\"} | json | event=\"access_request.review\"",
+            "queryType": "range",
+            "refId": "A"
+          }
+        ]
       },
       {
         "id": 10,
         "title": "All Access Request Events",
         "type": "logs",
-        "gridPos": {"h": 10, "w": 24, "x": 0, "y": 28},
-        "datasource": {"type": "loki", "uid": "afqc1lplux9fka"},
-        "options": {"dedupStrategy": "none", "enableLogDetails": true, "prettifyLogMessage": true, "showCommonLabels": false, "showLabels": false, "showTime": true, "sortOrder": "Descending", "wrapLogMessage": false},
-        "targets": [{"datasource": {"type": "loki", "uid": "afqc1lplux9fka"}, "expr": "{job=\"teleport-audit\"} | json | event=~\"access_request.*\"", "queryType": "range", "refId": "A"}]
+        "gridPos": {
+          "h": 10,
+          "w": 24,
+          "x": 0,
+          "y": 28
+        },
+        "datasource": {
+          "type": "loki",
+          "uid": "afqc1lplux9fka"
+        },
+        "options": {
+          "dedupStrategy": "none",
+          "enableLogDetails": true,
+          "prettifyLogMessage": true,
+          "showCommonLabels": false,
+          "showLabels": false,
+          "showTime": true,
+          "sortOrder": "Descending",
+          "wrapLogMessage": false
+        },
+        "targets": [
+          {
+            "datasource": {
+              "type": "loki",
+              "uid": "afqc1lplux9fka"
+            },
+            "expr": "{job=\"teleport-audit\"} | json | event=~\"access_request.*\"",
+            "queryType": "range",
+            "refId": "A"
+          }
+        ]
       }
     ],
-    "time": {"from": "now-24h", "to": "now"},
-    "timepicker": {}
+    "time": {
+      "from": "now-24h",
+      "to": "now"
+    },
+    "timepicker": {},
+    "uid": "102a1eb9-a3a2-469f-bf50-3d38fff552df"
   },
   "overwrite": true,
   "folderId": 0
