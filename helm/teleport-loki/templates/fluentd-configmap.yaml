@@ -25,8 +25,14 @@ data:
 
       <parse>
         @type json
+        time_key ""
       </parse>
     </source>
+
+    # Drop Fluentd's own internal log events — only forward Teleport audit events
+    <match fluent.**>
+      @type null
+    </match>
 
     # -----------------------------------------------------------------------
     # Output — forward to Grafana Loki
@@ -35,10 +41,9 @@ data:
       @type loki
       url "{{ .Values.loki.url }}"
       line_format json
-      {{- range $k, $v := .Values.loki.labels }}
-      <label>
-        {{ $k }} {{ $v }}
-      </label>
+      request_timeout 10s
+      {{- if .Values.loki.labels }}
+      extra_labels {{ .Values.loki.labels | toJson }}
       {{- end }}
 
       <buffer>
