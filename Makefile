@@ -6,14 +6,15 @@ KUBECONFIG   ?= $(HOME)/teleport-kubeconfig.yaml
 # Override these via env or a local .env file
 TELEPORT_ADDR  ?=
 LOKI_URL       ?= http://loki-gateway.grafana.svc.cluster.local
-GRAFANA_NS     ?= grafana
-GRAFANA_PASS   ?=
+GRAFANA_NS         ?= grafana
+GRAFANA_PASS       ?=
+SLACK_WEBHOOK_URL  ?=
 
 -include .env
 
 .PHONY: help setup-certs setup-identity setup-role setup-bot \
         create-tls-secret create-identity-secret install upgrade uninstall \
-        import-dashboards \
+        import-dashboards import-alerts \
         logs logs-fluentd logs-handler status clean
 
 help:  ## Show this help
@@ -124,6 +125,55 @@ import-dashboards: ## Import all dashboards from dashboards/ into Grafana
 	  echo "$$result" | python3 -c \
 	    "import sys,json; r=json.load(sys.stdin); print('   ', r.get('status','?'), r.get('url',''))"; \
 	done
+
+import-alerts: ## Import alert rules, contact points, and notification policy into Grafana
+	@if [ -z "$(GRAFANA_PASS)" ]; then \
+	  echo "==> Fetching Grafana admin password from secret ..."; \
+	  GRAFANA_PASS=$$(KUBECONFIG=$(KUBECONFIG) kubectl get secret -n $(GRAFANA_NS) grafana \
+	    -o jsonpath='{.data.admin-password}' | base64 -d); \
+	else \
+	  GRAFANA_PASS="$(GRAFANA_PASS)"; \
+	fi; \
+	if [ -z "$(SLACK_WEBHOOK_URL)" ]; then \
+	  echo "ERROR: SLACK_WEBHOOK_URL is not set. Add it to .env or pass it on the command line."; \
+	  exit 1; \
+	fi; \
+	GRAFANA_POD=$$(KUBECONFIG=$(KUBECONFIG) kubectl get pod -n $(GRAFANA_NS) \
+	  -l app.kubernetes.io/name=grafana \
+	  -o jsonpath='{.items[0].metadata.name}'); \
+	echo "==> Grafana pod: $$GRAFANA_POD"; \
+	echo "==> Creating Teleport Alerts folder ..."; \
+	KUBECONFIG=$(KUBECONFIG) kubectl exec -n $(GRAFANA_NS) "$$GRAFANA_POD" -- \
+	  curl -s -X POST "http://admin:$$GRAFANA_PASS@localhost:3000/api/folders" \
+	  -H 'Content-Type: application/json' \
+	  -d '{"uid":"efqce1rcnhvcwb","title":"Teleport Alerts"}' > /dev/null; \
+	echo "==> Importing contact point ..."; \
+	sed "s|\$${SLACK_WEBHOOK_URL}|$(SLACK_WEBHOOK_URL)|g" alerts/contact-points.json \
+	  > /tmp/contact-points-resolved.json; \
+	KUBECONFIG=$(KUBECONFIG) kubectl cp /tmp/contact-points-resolved.json \
+	  "$(GRAFANA_NS)/$$GRAFANA_POD:/tmp/contact-points.json"; \
+	python3 -c "import json; [print(json.dumps(cp)) for cp in json.load(open('/tmp/contact-points-resolved.json'))]" \
+	  | while read cp; do \
+	    echo "$$cp" | KUBECONFIG=$(KUBECONFIG) kubectl exec -i -n $(GRAFANA_NS) "$$GRAFANA_POD" -- \
+	      curl -s -X POST "http://admin:$$GRAFANA_PASS@localhost:3000/api/v1/provisioning/contact-points" \
+	      -H 'Content-Type: application/json' -d @- | python3 -c \
+	      "import sys,json; r=json.load(sys.stdin); print('   ', r.get('name', r.get('message','?')))"; \
+	  done; \
+	echo "==> Importing notification policy ..."; \
+	KUBECONFIG=$(KUBECONFIG) kubectl cp alerts/notification-policy.json \
+	  "$(GRAFANA_NS)/$$GRAFANA_POD:/tmp/notification-policy.json"; \
+	KUBECONFIG=$(KUBECONFIG) kubectl exec -n $(GRAFANA_NS) "$$GRAFANA_POD" -- \
+	  curl -s -X PUT "http://admin:$$GRAFANA_PASS@localhost:3000/api/v1/provisioning/policies" \
+	  -H 'Content-Type: application/json' -d @/tmp/notification-policy.json | python3 -c \
+	  "import sys,json; r=json.load(sys.stdin); print('   ', r.get('message','ok'))"; \
+	echo "==> Importing alert rules ..."; \
+	python3 -c "import json; [print(json.dumps(r)) for r in json.load(open('alerts/alert-rules.json'))]" \
+	  | while read rule; do \
+	    echo "$$rule" | KUBECONFIG=$(KUBECONFIG) kubectl exec -i -n $(GRAFANA_NS) "$$GRAFANA_POD" -- \
+	      curl -s -X POST "http://admin:$$GRAFANA_PASS@localhost:3000/api/v1/provisioning/alert-rules" \
+	      -H 'Content-Type: application/json' -d @- | python3 -c \
+	      "import sys,json; r=json.load(sys.stdin); print('   ', r.get('title', r.get('message','?')))"; \
+	  done
 
 # ------------------------------------------------------------------------------
 # Observability

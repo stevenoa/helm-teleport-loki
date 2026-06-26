@@ -1,0 +1,13 @@
+[
+  {
+    "uid": "ffqcelq0ota0wf",
+    "name": "teleport-slack",
+    "type": "slack",
+    "settings": {
+      "url": "${SLACK_WEBHOOK_URL}",
+      "title": ":rotating_light: Teleport Alert — {{ .CommonLabels.alertname }}",
+      "text": "{{ .CommonAnnotations.summary }}\n{{ .CommonAnnotations.description }}"
+    },
+    "disableResolveMessage": false
+  }
+]

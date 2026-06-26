@@ -1,0 +1,108 @@
+[
+  {
+    "uid": "ffqce2h2yubk0e",
+    "title": "Teleport Identity Changes",
+    "folderUID": "efqce1rcnhvcwb",
+    "ruleGroup": "teleport-identity",
+    "condition": "B",
+    "noDataState": "OK",
+    "execErrState": "Error",
+    "for": "0s",
+    "labels": {
+      "severity": "warning",
+      "team": "security"
+    },
+    "annotations": {
+      "summary": "Teleport identity change detected",
+      "description": "A role, user, lock, connector, or trusted cluster change was made in Teleport. Check the Identity Changes dashboard for details."
+    },
+    "data": [
+      {
+        "refId": "A",
+        "queryType": "range",
+        "relativeTimeRange": {"from": 300, "to": 0},
+        "datasourceUid": "afqc1lplux9fka",
+        "model": {
+          "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=~\"(role|user)\\\\.(create|update|delete)|lock\\\\.(create|delete)|(github|oidc|saml)\\\\.connector\\\\.(create|delete)|trusted_cluster\\\\.(create|delete)\" [5m]))",
+          "queryType": "range",
+          "refId": "A",
+          "legendFormat": ""
+        }
+      },
+      {
+        "refId": "B",
+        "queryType": "",
+        "relativeTimeRange": {"from": 0, "to": 0},
+        "datasourceUid": "-100",
+        "model": {
+          "conditions": [
+            {
+              "evaluator": {"params": [0], "type": "gt"},
+              "operator": {"type": "and"},
+              "query": {"params": ["A"]},
+              "reducer": {"params": [], "type": "last"},
+              "type": "query"
+            }
+          ],
+          "datasource": {"type": "__expr__", "uid": "-100"},
+          "expression": "A",
+          "refId": "B",
+          "type": "classic_conditions"
+        }
+      }
+    ]
+  },
+  {
+    "uid": "efqcet3wspnnkf",
+    "title": "Teleport Failed Logins",
+    "folderUID": "efqce1rcnhvcwb",
+    "ruleGroup": "teleport-identity",
+    "condition": "B",
+    "noDataState": "OK",
+    "execErrState": "Error",
+    "for": "0s",
+    "labels": {
+      "severity": "warning",
+      "team": "security"
+    },
+    "annotations": {
+      "summary": "Teleport failed login threshold exceeded",
+      "description": "More than 3 failed login attempts detected in the last 5 minutes. Check the Audit Events dashboard for details."
+    },
+    "data": [
+      {
+        "refId": "A",
+        "queryType": "range",
+        "relativeTimeRange": {"from": 300, "to": 0},
+        "datasourceUid": "afqc1lplux9fka",
+        "model": {
+          "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=\"user.login\" | success=\"false\" [5m]))",
+          "queryType": "range",
+          "refId": "A",
+          "legendFormat": ""
+        }
+      },
+      {
+        "refId": "B",
+        "queryType": "",
+        "relativeTimeRange": {"from": 0, "to": 0},
+        "datasourceUid": "-100",
+        "model": {
+          "conditions": [
+            {
+              "evaluator": {"params": [3], "type": "gt"},
+              "operator": {"type": "and"},
+              "query": {"params": ["A"]},
+              "reducer": {"params": [], "type": "last"},
+              "type": "query"
+            }
+          ],
+          "datasource": {"type": "__expr__", "uid": "-100"},
+          "expression": "A",
+          "refId": "B",
+          "type": "classic_conditions"
+        }
+      }
+    ]
+  }
+]

@@ -1,0 +1,13 @@
+{
+  "receiver": "grafana-default-email",
+  "group_by": ["grafana_folder", "alertname"],
+  "routes": [
+    {
+      "receiver": "teleport-slack",
+      "matchers": ["team=\"security\""],
+      "group_wait": "0s",
+      "group_interval": "1m",
+      "repeat_interval": "4h"
+    }
+  ]
+}
