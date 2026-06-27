@@ -23,7 +23,7 @@
         "relativeTimeRange": {"from": 300, "to": 0},
         "datasourceUid": "afqc1lplux9fka",
         "model": {
-          "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=~\"(role|user)\\\\.(create|update|delete)|lock\\\\.(create|delete)|(github|oidc|saml)\\\\.connector\\\\.(create|delete)|trusted_cluster\\\\.(create|delete)\" [5m]))",
+          "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=~\"(role|user)\\\\.(created?|updated?|deleted?)|lock\\\\.(created?|deleted?)|(github|oidc|saml)\\\\.connector\\\\.(created?|deleted?)|trusted_cluster\\\\.(created?|deleted?)\" [5m]))",
           "queryType": "range",
           "refId": "A",
           "legendFormat": ""
