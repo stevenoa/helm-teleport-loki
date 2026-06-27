@@ -388,10 +388,12 @@ Both alerts use the `team=security` label, which the included notification polic
 the `teleport-slack` contact point.
 
 The Identity Changes alert uses `sum by (event, user, name)` so each unique
-(event-type, actor, resource) combination creates its own alert instance. The Slack
-description renders as `{{ $labels.event }} on {{ $labels.name }} by {{ $labels.user }}`,
-giving the exact change without opening the dashboard. The alert clears ~3-4 minutes after
-the last matching event rolls out of the 2-minute window.
+(event-type, actor, resource) combination creates its own alert instance. The `summary`
+annotation renders as `{{ $labels.event }} on {{ $labels.name }} by {{ $labels.user }}`.
+The Slack contact point uses `{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}` to
+show each instance's rendered summary — `CommonAnnotations` cannot be used here because
+each instance has a different summary value. The alert clears ~3-4 minutes after the last
+matching event rolls out of the 2-minute window.
 
 The alert matches only past-tense event names (`role.created`, `user.updated`,
 etc.) — see [Teleport Enterprise Cloud event naming](#teleport-enterprise-cloud-emits-past-tense-event-type-names)
