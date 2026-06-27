@@ -387,6 +387,12 @@ Two alert rules are in the `alerts/` directory and route to a Slack contact poin
 Both alerts use the `team=security` label, which the included notification policy routes to
 the `teleport-slack` contact point.
 
+The Identity Changes alert matches only past-tense event names (`role.created`, `user.updated`,
+etc.) — see [Teleport Enterprise Cloud event naming](#teleport-enterprise-cloud-emits-past-tense-event-type-names)
+below. The notification policy uses `repeat_interval: 4h`, so repeated firing of the same
+continuous alert sends at most one Slack message every 4 hours; each new alert (after a
+resolve) sends immediately.
+
 To import after a fresh Grafana deploy:
 
 ```bash
@@ -577,6 +583,21 @@ and stalling ingestion. Three buffer settings cap this:
 - `total_limit_size 512m` — hard cap on total buffer disk usage
 - `overflow_action block` — back-pressures the event-handler (HTTP 503) instead of
   crashing; the event-handler retries, so no events are lost
+
+### Teleport Enterprise Cloud emits past-tense event type names
+
+The Teleport documentation and `teleport-event-handler configure` output use present-tense
+event type names (`role.create`, `user.update`, `role.delete`). Teleport Enterprise Cloud
+actually emits past-tense names (`role.created`, `user.updated`, `role.deleted`).
+
+If the `types` allowlist in `values.yaml` contains only present-tense names, those events
+are silently dropped and never reach Loki. The fix: include both forms in the allowlist.
+The current `values.yaml` lists both (e.g. `role.create` and `role.created`) for safety.
+
+The alert query in `alerts/alert-rules.json` matches past-tense only. Including the
+present-tense `?` variant (e.g. `updated?`) would also match `user.update` events emitted
+by tbot machine identity renewals (every 20 minutes), causing the Identity Changes alert to
+fire constantly. The regex uses exact past-tense forms to avoid this noise.
 
 ### Fluentd buffer must be on a PVC to survive restarts
 
