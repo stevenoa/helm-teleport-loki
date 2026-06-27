@@ -13,8 +13,8 @@
       "team": "security"
     },
     "annotations": {
-      "summary": "Teleport identity change detected",
-      "description": "{{ $labels.event }} on {{ $labels.name }} by {{ $labels.user }}"
+      "summary": "{{ $labels.event }} on {{ $labels.name }} by {{ $labels.user }}",
+      "description": "Teleport identity change detected"
     },
     "data": [
       {

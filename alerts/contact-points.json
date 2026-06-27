@@ -6,7 +6,7 @@
     "settings": {
       "url": "${SLACK_WEBHOOK_URL}",
       "title": ":rotating_light: Teleport Alert — {{ .CommonLabels.alertname }}",
-      "text": "{{ .CommonAnnotations.summary }}\n{{ .CommonAnnotations.description }}"
+      "text": "{{ range .Alerts }}{{ .Annotations.summary }}\n{{ end }}"
     },
     "disableResolveMessage": false
   }
