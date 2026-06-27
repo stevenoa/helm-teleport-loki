@@ -20,10 +20,10 @@
       {
         "refId": "A",
         "queryType": "range",
-        "relativeTimeRange": {"from": 300, "to": 0},
+        "relativeTimeRange": {"from": 120, "to": 0},
         "datasourceUid": "afqc1lplux9fka",
         "model": {
-          "expr": "sum by (event, user, name) (count_over_time({job=\"teleport-audit\"} | json | event=~\"(role|user)\\\\.(created|updated|deleted)|lock\\\\.(created|deleted)|(github|oidc|saml)\\\\.connector\\\\.(created|deleted)|trusted_cluster\\\\.(created|deleted)\" [5m]))",
+          "expr": "sum by (event, user, name) (count_over_time({job=\"teleport-audit\"} | json | event=~\"(role|user)\\\\.(created|updated|deleted)|lock\\\\.(created|deleted)|(github|oidc|saml)\\\\.connector\\\\.(created|deleted)|trusted_cluster\\\\.(created|deleted)\" [2m]))",
           "queryType": "range",
           "refId": "A",
           "legendFormat": ""
@@ -84,7 +84,7 @@
       {
         "refId": "A",
         "queryType": "range",
-        "relativeTimeRange": {"from": 300, "to": 0},
+        "relativeTimeRange": {"from": 120, "to": 0},
         "datasourceUid": "afqc1lplux9fka",
         "model": {
           "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=\"user.login\" | success=\"false\" [5m]))",
