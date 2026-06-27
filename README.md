@@ -379,15 +379,20 @@ and LogQL query examples for each dashboard.
 
 Two alert rules are in the `alerts/` directory and route to a Slack contact point:
 
-| Alert | Condition |
-|---|---|
-| Teleport Identity Changes | Any role, user, lock, connector, or trusted cluster change in a 5-minute window |
-| Teleport Failed Logins | More than 3 failed `user.login` events in a 5-minute window |
+| Alert | Condition | Slack message |
+|---|---|---|
+| Teleport Identity Changes | Any role, user, lock, connector, or trusted cluster change in a 5-minute window | `role.updated on dev by steven.oakley@goteleport.com` |
+| Teleport Failed Logins | More than 3 failed `user.login` events in a 5-minute window | *(count only — no per-event labels available)* |
 
 Both alerts use the `team=security` label, which the included notification policy routes to
 the `teleport-slack` contact point.
 
-The Identity Changes alert matches only past-tense event names (`role.created`, `user.updated`,
+The Identity Changes alert uses `sum by (event, user, name)` so each unique
+(event-type, actor, resource) combination creates its own alert instance. The Slack
+description renders as `{{ $labels.event }} on {{ $labels.name }} by {{ $labels.user }}`,
+giving the exact change without opening the dashboard.
+
+The alert matches only past-tense event names (`role.created`, `user.updated`,
 etc.) — see [Teleport Enterprise Cloud event naming](#teleport-enterprise-cloud-emits-past-tense-event-type-names)
 below. The notification policy uses `repeat_interval: 4h`, so repeated firing of the same
 continuous alert sends at most one Slack message every 4 hours; each new alert (after a
