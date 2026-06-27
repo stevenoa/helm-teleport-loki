@@ -381,7 +381,7 @@ Two alert rules are in the `alerts/` directory and route to a Slack contact poin
 
 | Alert | Condition | Slack message |
 |---|---|---|
-| Teleport Identity Changes | Any role, user, lock, connector, or trusted cluster change in a 5-minute window | `role.updated on dev by steven.oakley@goteleport.com` |
+| Teleport Identity Changes | Any role, user, lock, connector, or trusted cluster change in a 2-minute window | `role.updated on dev by steven.oakley@goteleport.com` |
 | Teleport Failed Logins | More than 3 failed `user.login` events in a 5-minute window | *(count only — no per-event labels available)* |
 
 Both alerts use the `team=security` label, which the included notification policy routes to
@@ -390,7 +390,8 @@ the `teleport-slack` contact point.
 The Identity Changes alert uses `sum by (event, user, name)` so each unique
 (event-type, actor, resource) combination creates its own alert instance. The Slack
 description renders as `{{ $labels.event }} on {{ $labels.name }} by {{ $labels.user }}`,
-giving the exact change without opening the dashboard.
+giving the exact change without opening the dashboard. The alert clears ~3-4 minutes after
+the last matching event rolls out of the 2-minute window.
 
 The alert matches only past-tense event names (`role.created`, `user.updated`,
 etc.) — see [Teleport Enterprise Cloud event naming](#teleport-enterprise-cloud-emits-past-tense-event-type-names)
