@@ -8,6 +8,17 @@ metadata:
 data:
   fluent.conf: |
     # -----------------------------------------------------------------------
+    # Monitor agent — plain HTTP health endpoint for k8s probes.
+    # Keeps liveness/readiness off the mTLS input port so probe connections
+    # (which never complete a TLS handshake) don't spam SSL_accept warnings.
+    # -----------------------------------------------------------------------
+    <source>
+      @type monitor_agent
+      bind 0.0.0.0
+      port {{ .Values.fluentd.monitorPort }}
+    </source>
+
+    # -----------------------------------------------------------------------
     # Input — receive JSON events from teleport-event-handler over HTTP
     # -----------------------------------------------------------------------
     <source>

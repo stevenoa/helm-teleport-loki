@@ -170,6 +170,9 @@ fluentd:
 
   # -- Port Fluentd listens on for incoming events from the event-handler
   port: 24224
+  # -- Plain-HTTP monitor_agent port used for k8s liveness/readiness probes
+  # (kept off the mTLS port so probes don't trigger SSL_accept warnings)
+  monitorPort: 24220
 
   resources:
     requests:

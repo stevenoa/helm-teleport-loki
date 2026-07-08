@@ -58,6 +58,9 @@ spec:
             - name: http-events
               containerPort: {{ .Values.fluentd.port }}
               protocol: TCP
+            - name: monitor
+              containerPort: {{ .Values.fluentd.monitorPort }}
+              protocol: TCP
           env:
             - name: GEM_HOME
               value: /usr/local/bundle
@@ -84,13 +87,15 @@ spec:
           resources:
             {{- toYaml .Values.fluentd.resources | nindent 12 }}
           livenessProbe:
-            tcpSocket:
-              port: http-events
+            httpGet:
+              path: /api/plugins.json
+              port: monitor
             initialDelaySeconds: 30
             periodSeconds: 30
           readinessProbe:
-            tcpSocket:
-              port: http-events
+            httpGet:
+              path: /api/plugins.json
+              port: monitor
             initialDelaySeconds: 10
             periodSeconds: 10
 

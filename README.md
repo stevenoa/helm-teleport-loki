@@ -337,6 +337,7 @@ All tunables live in `values.yaml`. The most commonly changed values:
 | `fluentd.persistence.enabled` | `true` | Persist Fluentd file buffer on a PVC |
 | `fluentd.persistence.size` | `2Gi` | Fluentd buffer PVC size |
 | `fluentd.port` | `24224` | Port Fluentd listens on inside the cluster |
+| `fluentd.monitorPort` | `24220` | Plain-HTTP `monitor_agent` port used for liveness/readiness probes |
 | `fluentd.buffer.flushInterval` | `10s` | How often Fluentd flushes the buffer to Loki |
 | `fluentd.buffer.chunkLimitSize` | `256m` | Maximum size of a single buffer chunk |
 | `fluentd.buffer.retryWait` | `1m` | Initial wait between retries on flush failure |
@@ -581,11 +582,22 @@ so the event-handler can verify the server certificate when connecting inside
 the cluster. If the release name or namespace changes, certs must be regenerated
 and the TLS secret updated.
 
-### Kubernetes readiness probes must use tcpSocket
+### Kubernetes readiness probes must not hit the mTLS input port
 
 When Fluentd's HTTP source has TLS enabled, plain HTTP health checks fail the
-TLS handshake and the pod never becomes Ready. The liveness and readiness probes
-use `tcpSocket` instead of `httpGet`.
+TLS handshake and the pod never becomes Ready. The original fix pointed the
+liveness/readiness probes at the TLS port with `tcpSocket` instead of `httpGet`
+— this made the pod Ready, but every probe connection opened and closed the
+socket without completing a TLS handshake, which Fluentd logged as a constant
+stream of `SSL_accept ... unexpected eof while reading` warnings (every 10s
+for readiness, every 30s for liveness).
+
+The fix: a `monitor_agent` source on a separate plain-HTTP port
+(`fluentd.monitorPort`, default `24220`), with `httpGet` probes against
+`/api/plugins.json` on that port instead. Probes never touch the TLS port, so
+the warning noise is gone and the check is more meaningful (it confirms
+Fluentd's HTTP server thread is actually responsive, not just that a socket
+accepts connections).
 
 ### Helm namespace adoption
 
