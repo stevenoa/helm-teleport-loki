@@ -377,15 +377,21 @@ and LogQL query examples for each dashboard.
 
 ## Grafana alerting
 
-Two alert rules are in the `alerts/` directory and route to a Slack contact point:
+Three alert rules are in the `alerts/` directory and route to a Slack contact point:
 
 | Alert | Condition | Slack message |
 |---|---|---|
 | Teleport Identity Changes | Any role, user, lock, connector, or trusted cluster change in a 2-minute window | `role.updated on dev by steven.oakley@goteleport.com` |
 | Teleport Failed Logins | More than 3 failed `user.login` events in a 5-minute window | *(count only — no per-event labels available)* |
+| Teleport Audit Pipeline No Data | Zero log lines on `{job="teleport-audit"}` for 30+ minutes (5m `for` delay) | Fires on pipeline stalls even when pods still show `Running` — see [Enterprise Cloud auto-upgrades break pinned client versions](#teleport-enterprise-cloud-auto-upgrades-break-pinned-client-versions) below |
 
-Both alerts use the `team=security` label, which the included notification policy routes to
+All three alerts use the `team=security` label, which the included notification policy routes to
 the `teleport-slack` contact point.
+
+The No Data alert sets `noDataState: Alerting` (the other two use the default `OK`) — when
+the `teleport-audit` stream truly has no log lines, Loki returns an empty result set rather
+than a zero-value series, which Grafana treats as "no data." Content-based alerts want `OK`
+for that case (no matching events is normal); a pipeline-health alert wants the opposite.
 
 The Identity Changes alert uses `sum by (event, user, name)` so each unique
 (event-type, actor, resource) combination creates its own alert instance. The `summary`
@@ -617,6 +623,36 @@ into buffer), those events are never retried and are permanently lost.
 The fix: a dedicated 2Gi PVC (`fluentd.persistence`, enabled by default) replaces the
 emptyDir. Buffer chunks survive pod restarts and keep retrying across transient Loki
 outages.
+
+### Teleport Enterprise Cloud auto-upgrades break pinned client versions
+
+Enterprise Cloud auto-upgrades the tenant's auth/proxy version without notice. If the
+pinned `tbot`/`event-handler` image tags in `values.yaml` fall behind, specific RPC
+transport paths can start failing while the pods otherwise look healthy — `kubectl get
+pods` still shows `Running`, and `tbot` keeps renewing its identity and submitting
+heartbeats successfully, because those calls use a different code path.
+
+Observed symptom: the event-handler's `GetEventExportChunks` call (the historical event
+export) failed on every retry with:
+
+```
+ssh: handshake failed: ssh: unable to authenticate, attempted methods [none publickey], no supported methods remain
+```
+
+and got stuck retrying the same date indefinitely — `events_per_minute:0` — while `tbot`
+logs showed nothing wrong. This went undetected for days because no alert watched for the
+*absence* of data, only its content (see the Teleport Audit Pipeline No Data alert above).
+
+Ruled out before landing on version skew: cert corruption (identity file was well-formed
+and fresh), CA rotation (`tctl status` showed host/user CAs never rotated), clock skew
+(node and cluster time matched), and RBAC (the failure occurs at the SSH transport-auth
+layer, before any permission check applies).
+
+The fix: pin both `tbot.image.tag` and `eventHandler.image.tag` to the exact same version
+as the cluster (check with `tctl status`), and avoid floating tags like `"18"` — with
+`imagePullPolicy: IfNotPresent`, a floating tag silently freezes at whatever patch was
+live on last pull and never re-resolves. Re-check for drift periodically since Enterprise
+Cloud upgrades on its own schedule.
 
 ## Files
 

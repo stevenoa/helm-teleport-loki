@@ -115,5 +115,69 @@
         }
       }
     ]
+  },
+  {
+    "uid": "gfqcenodata0001",
+    "title": "Teleport Audit Pipeline No Data",
+    "folderUID": "efqce1rcnhvcwb",
+    "ruleGroup": "teleport-pipeline",
+    "condition": "C",
+    "noDataState": "Alerting",
+    "execErrState": "Alerting",
+    "for": "5m",
+    "labels": {
+      "severity": "critical",
+      "team": "security"
+    },
+    "annotations": {
+      "summary": "No Teleport audit events received in the last 30 minutes",
+      "description": "The teleport-audit Loki stream has received zero log lines for 30+ minutes. This usually means the event-handler pipeline is stuck (e.g. auth/transport failure, version skew with Teleport Enterprise Cloud, or a crashed/misconfigured pod) even though pods may still show Running. Check event-handler logs: kubectl logs -n teleport-loki statefulset/teleport-loki-event-handler -c event-handler"
+    },
+    "data": [
+      {
+        "refId": "A",
+        "queryType": "range",
+        "relativeTimeRange": {"from": 1800, "to": 0},
+        "datasourceUid": "afqc1lplux9fka",
+        "model": {
+          "expr": "sum(count_over_time({job=\"teleport-audit\"} [30m]))",
+          "queryType": "range",
+          "refId": "A",
+          "legendFormat": ""
+        }
+      },
+      {
+        "refId": "B",
+        "queryType": "",
+        "relativeTimeRange": {"from": 0, "to": 0},
+        "datasourceUid": "-100",
+        "model": {
+          "datasource": {"type": "__expr__", "uid": "-100"},
+          "expression": "A",
+          "reducer": "last",
+          "refId": "B",
+          "type": "reduce",
+          "settings": {"mode": "dropNN"}
+        }
+      },
+      {
+        "refId": "C",
+        "queryType": "",
+        "relativeTimeRange": {"from": 0, "to": 0},
+        "datasourceUid": "-100",
+        "model": {
+          "datasource": {"type": "__expr__", "uid": "-100"},
+          "expression": "B",
+          "refId": "C",
+          "type": "threshold",
+          "conditions": [
+            {
+              "evaluator": {"params": [1], "type": "lt"},
+              "unloadEvaluator": null
+            }
+          ]
+        }
+      }
+    ]
   }
 ]
