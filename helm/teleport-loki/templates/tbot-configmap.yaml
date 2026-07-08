@@ -23,4 +23,9 @@ data:
         destination:
           type: directory
           path: /var/lib/teleport-event-handler/tbot-output
+          # No `readers` are configured (event-handler and tbot share this
+          # volume within the same pod), so ACL management is never used —
+          # and the PVC's filesystem doesn't support the legacy ACL check
+          # tbot runs by default, which otherwise logs a WARN every renewal.
+          acls: off
 {{- end }}

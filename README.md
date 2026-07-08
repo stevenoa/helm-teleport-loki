@@ -616,6 +616,22 @@ The fix: tbot writes its identity output to `/var/lib/teleport-event-handler/tbo
 on the state PVC, and the event-handler reads it from the same path. The file survives
 restarts, so there is no race on startup and reconnects always use a fresh cert from disk.
 
+### tbot logs a legacy-ACL warning on every identity renewal
+
+No `readers` are configured on the tbot identity output's directory destination —
+`event-handler` and `tbot` are containers in the same pod sharing the same PVC, so
+there's no cross-UID access to gate with ACLs. Without an explicit `acls` setting,
+tbot still defaults to `acls: try`, and on every renewal (`renewal_interval: 20m`)
+it runs a legacy-ACL ownership check on `/var/lib/teleport-event-handler/tbot-output`.
+That check fails on this cluster's PVC storage backend with `operation not supported`,
+logged as `Destination has unexpected ACLs` — never fatal, but recurring every
+20 minutes.
+
+The fix: set `acls: off` on the destination in `tbot-configmap.yaml`. This is a
+documented `botfs.ACLMode` value (see `lib/tbot/bot/destination/directory.go` in the
+Teleport source) for destinations that don't use the reader-based ACL feature, and it
+skips the ownership/legacy-ACL check entirely rather than suppressing its output.
+
 ### StatefulSet requires a ServiceAccount to exist
 
 The StatefulSet spec references `serviceAccountName: <release>-event-handler`. Without
