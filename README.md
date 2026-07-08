@@ -233,6 +233,8 @@ This runs:
    scoped to the `teleport-loki:teleport-loki-event-handler` ServiceAccount.
 4. **`create-tls-secret`** — creates the `teleport-loki-tls` Kubernetes Secret containing
    CA, client, and server certs plus the server key passphrase
+5. **`create-slack-secret`** — creates the `teleport-loki-slack` Kubernetes Secret holding
+   `SLACK_WEBHOOK_URL`, used by the [version drift check](#version-drift-check) CronJob
 
 > **Why no identity secret?** With tbot enabled (the default), the long-lived identity
 > file is replaced by the `tbot` sidecar. On first start, tbot presents the pod's
@@ -345,6 +347,8 @@ All tunables live in `values.yaml`. The most commonly changed values:
 | `eventHandler.types` | *(allowlist — see values.yaml)* | Audit event types to forward. Empty = all types (not recommended). Defaults to 42 security-relevant types; `kube.request` and other high-volume events are excluded. |
 | `eventHandler.image.tag` | `18` | Teleport event-handler image tag |
 | `fluentd.image.tag` | `v1.17` | Fluentd image tag |
+| `versionDriftCheck.enabled` | `true` | Run the [version drift check](#version-drift-check) CronJob |
+| `versionDriftCheck.schedule` | `*/30 * * * *` | Cron schedule for the drift check |
 
 ## Upgrading
 
@@ -417,6 +421,26 @@ Or add `SLACK_WEBHOOK_URL=...` to your `.env` file and run `make import-alerts`.
 
 > The Slack webhook URL is substituted at import time and is never written to the repo.
 
+## Version drift check
+
+A `CronJob` (`versionDriftCheck`, enabled by default, runs every 30 minutes) guards against
+the [Enterprise Cloud auto-upgrade incident](#teleport-enterprise-cloud-auto-upgrades-break-pinned-client-versions)
+recurring silently. Each run:
+
+1. Hits the cluster's unauthenticated `https://<teleport.addr>/webapi/ping` endpoint (no
+   credentials needed — this is the same endpoint `tsh`/browsers use before login) and reads
+   `server_version`.
+2. Compares it to `tbot.image.tag` (the pinned version).
+3. Posts a Slack message to `SLACK_WEBHOOK_URL` (from the `teleport-loki-slack` secret) if
+   they differ, naming both versions and the values to bump.
+
+The chart also fails to render (`helm template`/`install`/`upgrade`) if `tbot.image.tag` and
+`eventHandler.image.tag` don't match each other — the incident above was caused by exactly
+this kind of split, so it's checked at deploy time, not just at drift-check time.
+
+Requires the `teleport-loki-slack` secret: `make create-slack-secret` (included in `make
+setup` / `make setup-static`), sourced from `SLACK_WEBHOOK_URL` in `.env`.
+
 ## Makefile reference
 
 ```bash
@@ -429,6 +453,7 @@ make setup-bot           # create Teleport bot + bootstrap token (tbot mode)
 make setup-identity      # sign 1-year identity file (static mode only)
 make create-tls-secret   # load ./certs/ into k8s secret (CA + client + server certs)
 make create-identity-secret  # load ./identity/ into k8s secret (static mode only)
+make create-slack-secret # load SLACK_WEBHOOK_URL into k8s secret (version drift check)
 
 # Helm
 make install             # helm install
@@ -667,6 +692,7 @@ Cloud upgrades on its own schedule.
 | `helm/teleport-loki/templates/fluentd-deployment.yaml` | Fluentd workload (GEM_HOME fix, tcpSocket probes, PVC buffer) |
 | `helm/teleport-loki/templates/fluentd-buffer-pvc.yaml` | PVC for the Fluentd file buffer (survives restarts) |
 | `helm/teleport-loki/templates/fluentd-service.yaml` | ClusterIP service for Fluentd |
+| `helm/teleport-loki/templates/version-drift-cronjob.yaml` | CronJob comparing cluster version to pinned image tags; Slack-alerts on drift |
 | `dashboards/README.md` | Dashboard import instructions and LogQL query reference |
 | `dashboards/teleport-audit-events.json` | Grafana dashboard — general audit event overview |
 | `dashboards/teleport-kubernetes-access.json` | Grafana dashboard — Kubernetes access and exec activity |

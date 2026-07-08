@@ -216,3 +216,33 @@ persistence:
   storageClass: ""   # leave blank to use cluster default
   size: 1Gi
   accessMode: ReadWriteOnce
+
+# ------------------------------------------------------------------------------
+# Version drift check
+# Enterprise Cloud auto-upgrades the tenant's auth/proxy version without
+# notice. If the pinned tbot/eventHandler image tags above fall behind, the
+# event-handler can fail silently (see README: "Teleport Enterprise Cloud
+# auto-upgrades break pinned client versions"). This CronJob polls the
+# cluster's unauthenticated /webapi/ping endpoint, compares server_version
+# against tbot.image.tag, and posts to Slack on mismatch.
+# ------------------------------------------------------------------------------
+versionDriftCheck:
+  enabled: true
+  # -- Cron schedule (default: every 30 minutes)
+  schedule: "*/30 * * * *"
+  image:
+    repository: curlimages/curl
+    tag: "8.11.0"
+    pullPolicy: IfNotPresent
+  # -- Secret containing the Slack webhook URL (key: url).
+  #    Created externally by `make create-slack-secret` (see README).
+  slackWebhookSecret:
+    name: teleport-loki-slack
+    key: url
+  resources:
+    requests:
+      cpu: 10m
+      memory: 16Mi
+    limits:
+      cpu: 50m
+      memory: 32Mi

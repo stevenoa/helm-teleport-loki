@@ -13,7 +13,7 @@ SLACK_WEBHOOK_URL  ?=
 -include .env
 
 .PHONY: help setup-certs setup-identity setup-role setup-bot \
-        create-tls-secret create-identity-secret install upgrade uninstall \
+        create-tls-secret create-identity-secret create-slack-secret install upgrade uninstall \
         import-dashboards import-alerts \
         logs logs-fluentd logs-handler status clean
 
@@ -64,6 +64,18 @@ create-identity-secret: ## Create the Kubernetes identity secret from ./identity
 	  --from-file=identity=identity/identity \
 	  --dry-run=client -o yaml | kubectl apply -f -
 
+create-slack-secret: ## Create the Slack webhook secret used by the version-drift-check CronJob
+	@echo "==> Creating Slack webhook secret in namespace $(NAMESPACE) ..."
+	@if [ -z "$(SLACK_WEBHOOK_URL)" ]; then \
+	  echo "ERROR: SLACK_WEBHOOK_URL is not set. Add it to .env or pass it on the command line."; \
+	  exit 1; \
+	fi
+	kubectl create namespace $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
+	kubectl create secret generic teleport-loki-slack \
+	  --namespace $(NAMESPACE) \
+	  --from-literal=url=$(SLACK_WEBHOOK_URL) \
+	  --dry-run=client -o yaml | kubectl apply -f -
+
 setup-bot: ## Create Teleport bot and kubernetes join token (tbot mode — no secret created)
 	@echo "==> Creating Teleport bot ..."
 	tctl bots add event-handler-bot --roles=teleport-event-handler 2>/dev/null || \
@@ -74,9 +86,9 @@ setup-bot: ## Create Teleport bot and kubernetes join token (tbot mode — no se
 	@printf 'kind: token\nversion: v2\nmetadata:\n  name: event-handler-bot-join\nspec:\n  roles:\n  - Bot\n  bot_name: event-handler-bot\n  join_method: kubernetes\n  kubernetes:\n    type: static_jwks\n    static_jwks:\n      jwks: '"'"'$(JWKS)'"'"'\n    allow:\n    - service_account: "$(NAMESPACE):$(RELEASE)-event-handler"\n' | tctl create -f - 2>/dev/null || \
 	  echo "    Token already exists, skipping (run 'tctl tokens rm event-handler-bot-join' to recreate)"
 
-setup: setup-certs setup-role setup-bot create-tls-secret ## Full first-time setup (tbot mode — no identity secret needed)
+setup: setup-certs setup-role setup-bot create-tls-secret create-slack-secret ## Full first-time setup (tbot mode — no identity secret needed)
 
-setup-static: setup-certs setup-role setup-identity create-tls-secret create-identity-secret ## Full setup using a static 1-year identity secret (no tbot)
+setup-static: setup-certs setup-role setup-identity create-tls-secret create-identity-secret create-slack-secret ## Full setup using a static 1-year identity secret (no tbot)
 
 # ------------------------------------------------------------------------------
 # Helm

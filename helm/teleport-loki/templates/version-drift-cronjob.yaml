@@ -1,0 +1,81 @@
+{{- if ne .Values.tbot.image.tag .Values.eventHandler.image.tag }}
+{{- fail (printf "tbot.image.tag (%s) and eventHandler.image.tag (%s) must match — see README: \"Teleport Enterprise Cloud auto-upgrades break pinned client versions\"" .Values.tbot.image.tag .Values.eventHandler.image.tag) }}
+{{- end }}
+{{- if .Values.versionDriftCheck.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "teleport-loki.fullname" . }}-version-drift-check
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "teleport-loki.labels" . | nindent 4 }}
+data:
+  check.sh: |
+    #!/bin/sh
+    set -eu
+
+    PING_URL="https://${TELEPORT_ADDR}/webapi/ping"
+    SERVER_VERSION=$(curl -fsS "$PING_URL" | sed -n 's/.*"server_version":"\([^"]*\)".*/\1/p')
+
+    if [ -z "$SERVER_VERSION" ]; then
+      echo "ERROR: could not determine server_version from $PING_URL"
+      exit 1
+    fi
+
+    if [ "$SERVER_VERSION" != "$PINNED_VERSION" ]; then
+      echo "VERSION DRIFT: cluster=$SERVER_VERSION pinned=$PINNED_VERSION"
+      curl -fsS -X POST -H 'Content-Type: application/json' \
+        -d "{\"text\":\":rotating_light: Teleport version drift on \`${TELEPORT_ADDR}\`: cluster is running *${SERVER_VERSION}*, but tbot/event-handler are pinned to *${PINNED_VERSION}*. Update tbot.image.tag and eventHandler.image.tag in values.yaml, then \`make upgrade\`.\"}" \
+        "$SLACK_WEBHOOK_URL"
+    else
+      echo "OK: cluster version ${SERVER_VERSION} matches pinned version ${PINNED_VERSION}"
+    fi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "teleport-loki.fullname" . }}-version-drift-check
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "teleport-loki.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.versionDriftCheck.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            {{- include "teleport-loki.selectorLabels" . | nindent 12 }}
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: version-drift-check
+              image: "{{ .Values.versionDriftCheck.image.repository }}:{{ .Values.versionDriftCheck.image.tag }}"
+              imagePullPolicy: {{ .Values.versionDriftCheck.image.pullPolicy }}
+              command: ["sh", "/scripts/check.sh"]
+              env:
+                - name: TELEPORT_ADDR
+                  value: {{ .Values.teleport.addr | quote }}
+                - name: PINNED_VERSION
+                  value: {{ .Values.tbot.image.tag | quote }}
+                - name: SLACK_WEBHOOK_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.versionDriftCheck.slackWebhookSecret.name }}
+                      key: {{ .Values.versionDriftCheck.slackWebhookSecret.key }}
+              volumeMounts:
+                - name: script
+                  mountPath: /scripts
+                  readOnly: true
+              resources:
+                {{- toYaml .Values.versionDriftCheck.resources | nindent 16 }}
+          volumes:
+            - name: script
+              configMap:
+                name: {{ include "teleport-loki.fullname" . }}-version-drift-check
+                defaultMode: 0555
+{{- end }}
