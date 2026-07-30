@@ -1,0 +1,194 @@
+{
+  "dashboard": {
+    "uid": "nginx-k8s-access-demo",
+    "title": "Teleport — Nginx K8s Access Demo",
+    "tags": ["teleport", "kubernetes", "audit", "demo"],
+    "timezone": "browser",
+    "refresh": "30s",
+    "schemaVersion": 38,
+    "panels": [
+      {
+        "id": 1,
+        "title": "Total Requests (24h)",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+        "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "reduceOptions": { "calcs": ["sum"] }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "thresholds" },
+            "thresholds": { "steps": [{ "color": "blue", "value": null }] }
+          }
+        },
+        "targets": [
+          {
+            "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+            "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=\"kube.request\" | user=\"bot-gitlab-nginx-ci\" [$__range]))",
+            "queryType": "instant",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "nginx-prod1 Requests (24h)",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+        "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "reduceOptions": { "calcs": ["sum"] }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "thresholds" },
+            "thresholds": { "steps": [{ "color": "green", "value": null }] }
+          }
+        },
+        "targets": [
+          {
+            "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+            "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=\"kube.request\" | user=\"bot-gitlab-nginx-ci\" | resource_namespace=\"nginx-prod1\" [$__range]))",
+            "queryType": "instant",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "demo-nginx Requests (24h)",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+        "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "reduceOptions": { "calcs": ["sum"] }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "thresholds" },
+            "thresholds": { "steps": [{ "color": "orange", "value": null }] }
+          }
+        },
+        "targets": [
+          {
+            "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+            "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=\"kube.request\" | user=\"bot-gitlab-nginx-ci\" | resource_namespace=\"demo-nginx\" [$__range]))",
+            "queryType": "instant",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Non-200 Responses (24h)",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+        "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+        "description": "Requests forwarded to the Kubernetes API that came back with a non-200 status. Note: Teleport-level RBAC denials (kubernetes_resources rejections, e.g. the nginx-prod1 delete-blocked check) happen BEFORE the request reaches the API server, so they do not appear here as a non-200 kube.request event — only as the denial message returned directly to kubectl. This panel only catches denials from the Kubernetes API server's own RBAC, not Teleport's.",
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "reduceOptions": { "calcs": ["sum"] }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "thresholds" },
+            "thresholds": {
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "red", "value": 1 }
+              ]
+            }
+          }
+        },
+        "targets": [
+          {
+            "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+            "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=\"kube.request\" | user=\"bot-gitlab-nginx-ci\" | response_code!=\"200\" [$__range]))",
+            "queryType": "instant",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Request Rate by Namespace",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+        "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+        "targets": [
+          {
+            "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+            "expr": "sum by (resource_namespace) (rate({job=\"teleport-audit\"} | json | event=\"kube.request\" | user=\"bot-gitlab-nginx-ci\" [2m]))",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Request Rate by Verb",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+        "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+        "targets": [
+          {
+            "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+            "expr": "sum by (verb) (rate({job=\"teleport-audit\"} | json | event=\"kube.request\" | user=\"bot-gitlab-nginx-ci\" [2m]))",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Requests to nginx-prod1 (restart-only scope)",
+        "type": "logs",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+        "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+        "targets": [
+          {
+            "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+            "expr": "{job=\"teleport-audit\"} | json | event=\"kube.request\" | user=\"bot-gitlab-nginx-ci\" | resource_namespace=\"nginx-prod1\"",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Requests to demo-nginx (full-access scope)",
+        "type": "logs",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+        "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+        "targets": [
+          {
+            "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+            "expr": "{job=\"teleport-audit\"} | json | event=\"kube.request\" | user=\"bot-gitlab-nginx-ci\" | resource_namespace=\"demo-nginx\"",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "All gitlab-nginx-ci Kubernetes Requests",
+        "type": "logs",
+        "gridPos": { "h": 10, "w": 24, "x": 0, "y": 20 },
+        "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+        "targets": [
+          {
+            "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+            "expr": "{job=\"teleport-audit\"} | json | event=\"kube.request\" | user=\"bot-gitlab-nginx-ci\"",
+            "refId": "A"
+          }
+        ]
+      }
+    ]
+  },
+  "overwrite": true,
+  "folderId": 0
+}

@@ -86,7 +86,10 @@ eventHandler:
   # -- Allowlist of audit event types to forward to Loki.
   # Empty list = forward all types (not recommended — kube.request is very high volume).
   # This list covers security-relevant events while excluding noise
-  # (kube.request, resize, app.session.request, app.session.chunk, session.print).
+  # (resize, app.session.request, app.session.chunk, session.print).
+  # kube.request WAS excluded as noise too, but is included deliberately to
+  # audit individual kubectl calls (incl. denials) for the nginx-k8s-access-demo -
+  # watch Loki ingest volume if this becomes a problem at scale.
   types:
     # Auth & certificates
     - auth
@@ -120,6 +123,8 @@ eventHandler:
     - session.data
     - exec
     - port
+    # Kubernetes API requests (individual kubectl calls, incl. denials)
+    - kube.request
     # Database access
     - db.session.start
     - db.session.end

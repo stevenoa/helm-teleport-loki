@@ -10,6 +10,7 @@ Pre-built Grafana dashboards for Teleport audit events stored in Grafana Loki.
 | `teleport-kubernetes-access.json` | Teleport — Kubernetes Access | K8s session starts/ends, exec commands, port forwards — broken down by cluster and user |
 | `teleport-access-requests.json` | Teleport — Access Requests | JIT access request lifecycle — created, approved, denied — by requester and reviewer |
 | `teleport-identity-changes.json` | Teleport — Identity Changes | Role, user, lock, connector, and trusted cluster changes — all turns red on any activity |
+| `teleport-nginx-k8s-demo.json` | Teleport — Nginx K8s Access Demo | `kube.request` events for the `gitlab-nginx-ci` bot only — restart-only traffic to `nginx-prod1` vs. full-access traffic to `demo-nginx` |
 
 ## Importing dashboards
 
@@ -192,6 +193,45 @@ any activity — useful as a security monitoring view where the expected state i
 # Locks only
 {job="teleport-audit"} | json | event=~"lock\\.(create|delete)"
 ```
+
+---
+
+### Teleport — Nginx K8s Access Demo (`teleport-nginx-k8s-demo.json`)
+
+Scoped to a single identity — the `gitlab-nginx-ci` bot from
+[project_nginx_k8s_access_demo](https://gitlab.steveno-enterprise-cloud.teleport.sh/steven.oakley/ansible/-/blob/main/docs/nginx-k8s-access-runbook.md).
+Every panel filters on `user="bot-gitlab-nginx-ci"`, so this dashboard shows
+nothing for any other identity even though `kube.request` is a
+cluster-wide, high-volume event type.
+
+**Panels:**
+
+| Panel | Type | Query |
+|---|---|---|
+| Total Requests (24h) | Stat | `... \| event="kube.request" \| user="bot-gitlab-nginx-ci"` |
+| nginx-prod1 Requests (24h) | Stat | `... \| resource_namespace="nginx-prod1"` |
+| demo-nginx Requests (24h) | Stat | `... \| resource_namespace="demo-nginx"` |
+| Non-200 Responses (24h) | Stat | `... \| response_code!="200"` — turns red if > 0 |
+| Request Rate by Namespace | Timeseries | `sum by (resource_namespace) (rate(...))` |
+| Request Rate by Verb | Timeseries | `sum by (verb) (rate(...))` |
+| Requests to nginx-prod1 | Logs | Live stream, restart-only scope |
+| Requests to demo-nginx | Logs | Live stream, full-access scope |
+| All gitlab-nginx-ci Kubernetes Requests | Logs | Full stream for this identity only |
+
+**Known gap:** Teleport's own RBAC denials (the `kubernetes_resources` field
+rejecting e.g. a `delete` in `nginx-prod1`) happen *before* the request
+reaches the Kubernetes API server, so they never generate a non-200
+`kube.request` event — only a denial message returned directly to
+`kubectl`. The "Non-200 Responses" panel only catches denials from the
+Kubernetes API server's own RBAC, not Teleport's. To see Teleport-level
+denials, check the CI job log directly (`nginx-k8s-access-demo` in
+`machine-id-demo`) rather than this dashboard.
+
+`kube.request` fires on every single Kubernetes API call — it's excluded
+from the default event-handler `types` allow-list as noise (see the
+comment in `values.yaml`). It was deliberately re-added specifically to
+support this dashboard; watch Loki ingest volume if that becomes a
+problem at scale.
 
 ---
 
