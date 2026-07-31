@@ -707,6 +707,30 @@ as the cluster (check with `tctl status`), and avoid floating tags like `"18"` �
 live on last pull and never re-resolves. Re-check for drift periodically since Enterprise
 Cloud upgrades on its own schedule.
 
+### Self-healing
+
+The `event-handler` has been observed to stop exporting audit events for two different
+reasons — the version drift above, and separately, its own long-lived connection to
+Teleport simply going stale after many hours of uptime (~15h observed) even while `tbot`'s
+identity renewal keeps succeeding underneath it the whole time. Both times the fix was the
+same: `kubectl delete pod` on the event-handler StatefulSet pod (it comes back
+automatically).
+
+Rather than diagnose *why* every time, `self-heal-cronjob.yaml` just checks "has any audit
+data flowed in the last 20 minutes" (`sum(count_over_time({job="teleport-audit"}[20m]))`
+against Loki) every 10 minutes, and restarts the event-handler pod if not — Slack-notifying
+either way. If it has to restart repeatedly, that's a real signal a human should
+investigate rather than something to suppress, so it doesn't try to avoid re-restarting a
+recently-restarted pod.
+
+RBAC for the restart is scoped to `delete` on exactly the one named event-handler pod, via
+a dedicated ServiceAccount — it can't touch anything else, including the `fluentd`
+deployment in the same namespace. The check itself has no `kubectl` binary in its image
+(reuses the same minimal `curlimages/curl` image as `version-drift-check`) — it hits the
+Kubernetes API directly with `curl` using the pod's own mounted ServiceAccount token
+(`/var/run/secrets/kubernetes.io/serviceaccount/{token,ca.crt}`), the same in-cluster auth
+mechanism `kubectl`/client libraries use internally.
+
 ## Files
 
 | File | Purpose |
@@ -721,6 +745,7 @@ Cloud upgrades on its own schedule.
 | `helm/teleport-loki/templates/fluentd-buffer-pvc.yaml` | PVC for the Fluentd file buffer (survives restarts) |
 | `helm/teleport-loki/templates/fluentd-service.yaml` | ClusterIP service for Fluentd |
 | `helm/teleport-loki/templates/version-drift-cronjob.yaml` | CronJob comparing cluster version to pinned image tags; Slack-alerts on drift |
+| `helm/teleport-loki/templates/self-heal-cronjob.yaml` | CronJob checking for audit-pipeline "no data"; auto-restarts event-handler and Slack-notifies |
 | `dashboards/README.md` | Dashboard import instructions and LogQL query reference |
 | `dashboards/teleport-audit-events.json` | Grafana dashboard — general audit event overview |
 | `dashboards/teleport-kubernetes-access.json` | Grafana dashboard — Kubernetes access and exec activity |

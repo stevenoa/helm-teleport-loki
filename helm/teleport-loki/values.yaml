@@ -254,3 +254,42 @@ versionDriftCheck:
     limits:
       cpu: 50m
       memory: 32Mi
+
+# ------------------------------------------------------------------------------
+# Self-healing
+# The event-handler has been observed to stop exporting audit events for two
+# different reasons - version drift (see above) and, separately, its own
+# long-lived connection going stale after many hours of uptime even while
+# tbot's identity renewal stays healthy underneath it. Both times the actual
+# fix was a plain pod restart. Rather than diagnose *why* each time, this
+# CronJob just checks "has any audit data flowed recently" and restarts the
+# event-handler pod if not, Slack-notifying either way so there's still
+# visibility if it has to fire repeatedly (which would mean a restart isn't
+# actually fixing the underlying problem and a human should look).
+# ------------------------------------------------------------------------------
+selfHeal:
+  enabled: true
+  # -- Cron schedule (default: every 10 minutes - faster than the Grafana
+  #    "Teleport Audit Pipeline No Data" alert's 30-minute threshold, so in
+  #    the common case this fixes it before that alert would even fire)
+  schedule: "*/10 * * * *"
+  # -- Window checked for zero audit events. Wider than the schedule
+  #    interval so consecutive checks overlap and no gap goes undetected
+  #    for longer than one check interval.
+  noDataWindow: "20m"
+  image:
+    repository: curlimages/curl
+    tag: "8.11.0"
+    pullPolicy: IfNotPresent
+  # -- Secret containing the Slack webhook URL (key: url). Reuses the same
+  #    secret as versionDriftCheck.
+  slackWebhookSecret:
+    name: teleport-loki-slack
+    key: url
+  resources:
+    requests:
+      cpu: 10m
+      memory: 16Mi
+    limits:
+      cpu: 100m
+      memory: 32Mi

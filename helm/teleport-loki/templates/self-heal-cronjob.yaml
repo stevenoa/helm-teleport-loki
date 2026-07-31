@@ -1,0 +1,126 @@
+{{- if .Values.selfHeal.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "teleport-loki.fullname" . }}-self-heal
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "teleport-loki.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "teleport-loki.fullname" . }}-self-heal
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "teleport-loki.labels" . | nindent 4 }}
+rules:
+  # Scoped to exactly the one pod this job is allowed to restart - nothing
+  # else, no wildcards, no other namespaces.
+  - apiGroups: [""]
+    resources: ["pods"]
+    resourceNames: ["{{ include "teleport-loki.fullname" . }}-event-handler-0"]
+    verbs: ["delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "teleport-loki.fullname" . }}-self-heal
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "teleport-loki.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "teleport-loki.fullname" . }}-self-heal
+    namespace: {{ .Values.namespace }}
+roleRef:
+  kind: Role
+  name: {{ include "teleport-loki.fullname" . }}-self-heal
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "teleport-loki.fullname" . }}-self-heal
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "teleport-loki.labels" . | nindent 4 }}
+data:
+  check.sh: |
+    #!/bin/sh
+    set -eu
+
+    COUNT=$(curl -fsS -G "${LOKI_URL}/loki/api/v1/query" \
+      --data-urlencode "query=sum(count_over_time({job=\"teleport-audit\"}[${NO_DATA_WINDOW}]))" \
+      | sed -n 's/.*"value":\[[0-9.]*,"\([0-9]*\)"\].*/\1/p')
+    COUNT="${COUNT:-0}"
+
+    if [ "$COUNT" -gt 0 ]; then
+      echo "OK: $COUNT audit events in the last ${NO_DATA_WINDOW}"
+      exit 0
+    fi
+
+    echo "ALERT: 0 audit events in the last ${NO_DATA_WINDOW} - restarting ${EVENT_HANDLER_POD}"
+
+    KUBE_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+    CACERT=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    curl -fsS -X DELETE --cacert "$CACERT" -H "Authorization: Bearer $KUBE_TOKEN" \
+      "https://kubernetes.default.svc/api/v1/namespaces/${NAMESPACE}/pods/${EVENT_HANDLER_POD}"
+
+    curl -fsS -X POST -H 'Content-Type: application/json' \
+      -d "{\"text\":\":robot_face: Self-healed: restarted \`${EVENT_HANDLER_POD}\` after 0 audit events for ${NO_DATA_WINDOW}+. If this keeps happening, investigate - restarts shouldn't be needed repeatedly.\"}" \
+      "$SLACK_WEBHOOK_URL"
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "teleport-loki.fullname" . }}-self-heal
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "teleport-loki.labels" . | nindent 4 }}
+spec:
+  schedule: {{ .Values.selfHeal.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            {{- include "teleport-loki.selectorLabels" . | nindent 12 }}
+        spec:
+          serviceAccountName: {{ include "teleport-loki.fullname" . }}-self-heal
+          restartPolicy: Never
+          containers:
+            - name: self-heal
+              image: "{{ .Values.selfHeal.image.repository }}:{{ .Values.selfHeal.image.tag }}"
+              imagePullPolicy: {{ .Values.selfHeal.image.pullPolicy }}
+              command: ["sh", "/scripts/check.sh"]
+              env:
+                - name: LOKI_URL
+                  value: {{ .Values.loki.url | quote }}
+                - name: NO_DATA_WINDOW
+                  value: {{ .Values.selfHeal.noDataWindow | quote }}
+                - name: NAMESPACE
+                  value: {{ .Values.namespace | quote }}
+                - name: EVENT_HANDLER_POD
+                  value: "{{ include "teleport-loki.fullname" . }}-event-handler-0"
+                - name: SLACK_WEBHOOK_URL
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.selfHeal.slackWebhookSecret.name }}
+                      key: {{ .Values.selfHeal.slackWebhookSecret.key }}
+              volumeMounts:
+                - name: script
+                  mountPath: /scripts
+                  readOnly: true
+              resources:
+                {{- toYaml .Values.selfHeal.resources | nindent 16 }}
+          volumes:
+            - name: script
+              configMap:
+                name: {{ include "teleport-loki.fullname" . }}-self-heal
+                defaultMode: 0555
+{{- end }}
