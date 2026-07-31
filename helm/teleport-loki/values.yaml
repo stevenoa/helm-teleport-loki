@@ -226,34 +226,55 @@ persistence:
   accessMode: ReadWriteOnce
 
 # ------------------------------------------------------------------------------
-# Version drift check
+# Version drift check (self-healing)
 # Enterprise Cloud auto-upgrades the tenant's auth/proxy version without
 # notice. If the pinned tbot/eventHandler image tags above fall behind, the
 # event-handler can fail silently (see README: "Teleport Enterprise Cloud
 # auto-upgrades break pinned client versions"). This CronJob polls the
 # cluster's unauthenticated /webapi/ping endpoint, compares server_version
-# against tbot.image.tag, and posts to Slack on mismatch.
+# against tbot.image.tag, and on drift: (1) immediately patches the live
+# StatefulSet's image tags and restarts the pod, then (2) commits the same
+# tag bump to values.yaml in git so a future `make upgrade` doesn't revert
+# it. Slack-notifies with the outcome of both steps either way.
 # ------------------------------------------------------------------------------
 versionDriftCheck:
   enabled: true
   # -- Cron schedule (default: every 30 minutes)
   schedule: "*/30 * * * *"
   image:
-    repository: curlimages/curl
-    tag: "8.11.0"
+    # alpine/git, not curlimages/curl - the git sync step needs git; curl
+    # is installed at runtime via apk (see check.sh) rather than
+    # maintaining a custom-built image just to bundle both.
+    repository: alpine/git
+    tag: "2.47.1"
     pullPolicy: IfNotPresent
+  # -- GitHub repo to sync values.yaml against, as "host/owner/repo.git"
+  #    (no scheme - the script prepends https://x-access-token:$TOKEN@)
+  gitRepo: "github.com/stevenoa/helm-teleport-loki.git"
+  # -- Path to values.yaml within the repo above
+  valuesFilePath: "helm/teleport-loki/values.yaml"
+  # -- Secret containing a GitHub fine-grained PAT (key: token), scoped to
+  #    ONLY this repo with Contents: Read & Write permission - nothing
+  #    broader. Created externally by `make create-github-secret` (see
+  #    README) - never commit this token anywhere.
+  githubTokenSecret:
+    name: teleport-loki-github
+    key: token
   # -- Secret containing the Slack webhook URL (key: url).
   #    Created externally by `make create-slack-secret` (see README).
   slackWebhookSecret:
     name: teleport-loki-slack
     key: url
   resources:
+    # Higher than a plain curl job needs - apk add + git clone/commit/push
+    # spike noticeably more than a bare HTTP call (OOMKilled at 32Mi in
+    # testing).
     requests:
-      cpu: 10m
-      memory: 16Mi
+      cpu: 20m
+      memory: 64Mi
     limits:
-      cpu: 50m
-      memory: 32Mi
+      cpu: 200m
+      memory: 256Mi
 
 # ------------------------------------------------------------------------------
 # Self-healing

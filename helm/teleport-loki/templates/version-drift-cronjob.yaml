@@ -3,6 +3,50 @@
 {{- end }}
 {{- if .Values.versionDriftCheck.enabled }}
 apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "teleport-loki.fullname" . }}-version-drift-check
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "teleport-loki.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "teleport-loki.fullname" . }}-version-drift-check
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "teleport-loki.labels" . | nindent 4 }}
+rules:
+  # Scoped to exactly the one StatefulSet this job is allowed to patch
+  # (image tags only, via a strategic-merge-patch) and the one pod it's
+  # allowed to restart afterwards - nothing else, no wildcards.
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    resourceNames: ["{{ include "teleport-loki.fullname" . }}-event-handler"]
+    verbs: ["get", "patch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    resourceNames: ["{{ include "teleport-loki.fullname" . }}-event-handler-0"]
+    verbs: ["delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "teleport-loki.fullname" . }}-version-drift-check
+  namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "teleport-loki.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "teleport-loki.fullname" . }}-version-drift-check
+    namespace: {{ .Values.namespace }}
+roleRef:
+  kind: Role
+  name: {{ include "teleport-loki.fullname" . }}-version-drift-check
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ include "teleport-loki.fullname" . }}-version-drift-check
@@ -14,6 +58,11 @@ data:
     #!/bin/sh
     set -eu
 
+    # This image is alpine/git (needed for the git sync step below), which
+    # doesn't ship curl by default - install it at runtime rather than
+    # maintaining a custom-built image just for this.
+    apk add --no-cache curl >/dev/null 2>&1
+
     PING_URL="https://${TELEPORT_ADDR}/webapi/ping"
     SERVER_VERSION=$(curl -fsS "$PING_URL" | sed -n 's/.*"server_version":"\([^"]*\)".*/\1/p')
 
@@ -22,14 +71,62 @@ data:
       exit 1
     fi
 
-    if [ "$SERVER_VERSION" != "$PINNED_VERSION" ]; then
-      echo "VERSION DRIFT: cluster=$SERVER_VERSION pinned=$PINNED_VERSION"
-      curl -fsS -X POST -H 'Content-Type: application/json' \
-        -d "{\"text\":\":rotating_light: Teleport version drift on \`${TELEPORT_ADDR}\`: cluster is running *${SERVER_VERSION}*, but tbot/event-handler are pinned to *${PINNED_VERSION}*. Update tbot.image.tag and eventHandler.image.tag in values.yaml, then \`make upgrade\`.\"}" \
-        "$SLACK_WEBHOOK_URL"
-    else
+    if [ "$SERVER_VERSION" = "$PINNED_VERSION" ]; then
       echo "OK: cluster version ${SERVER_VERSION} matches pinned version ${PINNED_VERSION}"
+      exit 0
     fi
+
+    echo "VERSION DRIFT: cluster=$SERVER_VERSION pinned=$PINNED_VERSION - self-healing"
+
+    # 1. Patch the live StatefulSet immediately so the pipeline recovers now,
+    #    without waiting on the git round-trip below to succeed or fail.
+    KUBE_TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+    CACERT=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    PATCH_BODY="{\"spec\":{\"template\":{\"spec\":{\"containers\":[{\"name\":\"event-handler\",\"image\":\"${EVENT_HANDLER_REPOSITORY}:${SERVER_VERSION}\"},{\"name\":\"tbot\",\"image\":\"${TBOT_REPOSITORY}:${SERVER_VERSION}\"}]}}}}"
+
+    curl -fsS -X PATCH --cacert "$CACERT" -H "Authorization: Bearer $KUBE_TOKEN" \
+      -H "Content-Type: application/strategic-merge-patch+json" \
+      -d "$PATCH_BODY" \
+      "https://kubernetes.default.svc/apis/apps/v1/namespaces/${NAMESPACE}/statefulsets/${STATEFULSET_NAME}"
+
+    curl -fsS -X DELETE --cacert "$CACERT" -H "Authorization: Bearer $KUBE_TOKEN" \
+      "https://kubernetes.default.svc/api/v1/namespaces/${NAMESPACE}/pods/${EVENT_HANDLER_POD}"
+
+    echo "Live StatefulSet patched to ${SERVER_VERSION} and pod restarted"
+
+    # 2. Sync values.yaml in git so a future `make upgrade` doesn't revert
+    #    this by re-applying the now-stale pinned tag. Failure here doesn't
+    #    undo the live fix above - it's reported separately.
+    GIT_SYNC_STATUS="committed and pushed"
+    if [ -z "${GITHUB_TOKEN:-}" ]; then
+      echo "GITHUB_TOKEN not set (teleport-loki-github secret doesn't exist yet) - skipping git sync"
+      GIT_SYNC_STATUS="FAILED - GITHUB_TOKEN not set, run 'make create-github-secret'"
+    elif git clone --depth=1 "https://x-access-token:${GITHUB_TOKEN}@${GITHUB_REPO}" /tmp/repo >/tmp/git-clone.log 2>&1; then
+      cd /tmp/repo
+      git config user.email "self-heal@teleport-loki.local"
+      git config user.name "teleport-loki self-heal"
+      sed -i "s/tag: \"${PINNED_VERSION}\"/tag: \"${SERVER_VERSION}\"/g" "${VALUES_FILE_PATH}"
+      if git diff --quiet; then
+        GIT_SYNC_STATUS="no-op (values.yaml already matched somehow)"
+      elif ! git commit -am "Self-heal: bump pinned tbot/event-handler tags to ${SERVER_VERSION} (was ${PINNED_VERSION}), auto-committed by version-drift-check" >/tmp/git-commit.log 2>&1; then
+        GIT_SYNC_STATUS="FAILED to commit - $(tail -1 /tmp/git-commit.log)"
+      elif ! git push origin main >/tmp/git-push.log 2>&1; then
+        GIT_SYNC_STATUS="FAILED to push - $(tail -1 /tmp/git-push.log)"
+      fi
+    else
+      GIT_SYNC_STATUS="FAILED to clone - $(tail -1 /tmp/git-clone.log)"
+    fi
+
+    echo "Git sync: ${GIT_SYNC_STATUS}"
+
+    curl -fsS -X POST -H 'Content-Type: application/json' \
+      -d "{\"text\":\":robot_face: Self-healed version drift: cluster is on *${SERVER_VERSION}*, was pinned to *${PINNED_VERSION}*. Live StatefulSet patched and pod restarted immediately. values.yaml in git: ${GIT_SYNC_STATUS}.\"}" \
+      "$SLACK_WEBHOOK_URL"
+
+    case "$GIT_SYNC_STATUS" in
+      "committed and pushed"|"no-op"*) exit 0 ;;
+      *) exit 1 ;;
+    esac
 ---
 apiVersion: batch/v1
 kind: CronJob
@@ -51,6 +148,7 @@ spec:
           labels:
             {{- include "teleport-loki.selectorLabels" . | nindent 12 }}
         spec:
+          serviceAccountName: {{ include "teleport-loki.fullname" . }}-version-drift-check
           restartPolicy: Never
           containers:
             - name: version-drift-check
@@ -62,6 +160,30 @@ spec:
                   value: {{ .Values.teleport.addr | quote }}
                 - name: PINNED_VERSION
                   value: {{ .Values.tbot.image.tag | quote }}
+                - name: EVENT_HANDLER_REPOSITORY
+                  value: {{ .Values.eventHandler.image.repository | quote }}
+                - name: TBOT_REPOSITORY
+                  value: {{ .Values.tbot.image.repository | quote }}
+                - name: NAMESPACE
+                  value: {{ .Values.namespace | quote }}
+                - name: STATEFULSET_NAME
+                  value: "{{ include "teleport-loki.fullname" . }}-event-handler"
+                - name: EVENT_HANDLER_POD
+                  value: "{{ include "teleport-loki.fullname" . }}-event-handler-0"
+                - name: GITHUB_REPO
+                  value: {{ .Values.versionDriftCheck.gitRepo | quote }}
+                - name: VALUES_FILE_PATH
+                  value: {{ .Values.versionDriftCheck.valuesFilePath | quote }}
+                - name: GITHUB_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Values.versionDriftCheck.githubTokenSecret.name }}
+                      key: {{ .Values.versionDriftCheck.githubTokenSecret.key }}
+                      # Optional: the live-cluster fix doesn't depend on this secret
+                      # existing. Without it, the git sync step just fails gracefully
+                      # (reported distinctly in Slack) instead of blocking the pod
+                      # from starting at all.
+                      optional: true
                 - name: SLACK_WEBHOOK_URL
                   valueFrom:
                     secretKeyRef:

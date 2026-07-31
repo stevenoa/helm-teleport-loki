@@ -234,7 +234,12 @@ This runs:
 4. **`create-tls-secret`** — creates the `teleport-loki-tls` Kubernetes Secret containing
    CA, client, and server certs plus the server key passphrase
 5. **`create-slack-secret`** — creates the `teleport-loki-slack` Kubernetes Secret holding
-   `SLACK_WEBHOOK_URL`, used by the [version drift check](#version-drift-check) CronJob
+   `SLACK_WEBHOOK_URL`, used by both self-healing CronJobs
+6. **`create-github-secret`** *(optional)* — creates the `teleport-loki-github` Kubernetes
+   Secret holding a GitHub fine-grained PAT (scoped to only this repo, Contents: Read and
+   write), used by `version-drift-check` to commit its tag fix back to `values.yaml`. If
+   skipped, version-drift self-healing still patches the live cluster fine — only the git
+   sync step fails (reported in Slack), so `make upgrade` could later revert the live fix
 
 > **Why no identity secret?** With tbot enabled (the default), the long-lived identity
 > file is replaced by the `tbot` sidecar. On first start, tbot presents the pod's
@@ -701,34 +706,47 @@ and fresh), CA rotation (`tctl status` showed host/user CAs never rotated), cloc
 (node and cluster time matched), and RBAC (the failure occurs at the SSH transport-auth
 layer, before any permission check applies).
 
-The fix: pin both `tbot.image.tag` and `eventHandler.image.tag` to the exact same version
-as the cluster (check with `tctl status`), and avoid floating tags like `"18"` — with
-`imagePullPolicy: IfNotPresent`, a floating tag silently freezes at whatever patch was
-live on last pull and never re-resolves. Re-check for drift periodically since Enterprise
-Cloud upgrades on its own schedule.
+This is now self-healing (see below) — `version-drift-check` patches the pinned tags
+automatically on drift. Pinning both `tbot.image.tag` and `eventHandler.image.tag` to the
+exact same version as the cluster (check with `tctl status`) is still the right baseline
+for a fresh `make install`, and avoid floating tags like `"18"` — with `imagePullPolicy:
+IfNotPresent`, a floating tag silently freezes at whatever patch was live on last pull and
+never re-resolves.
 
 ### Self-healing
 
 The `event-handler` has been observed to stop exporting audit events for two different
-reasons — the version drift above, and separately, its own long-lived connection to
-Teleport simply going stale after many hours of uptime (~15h observed) even while `tbot`'s
-identity renewal keeps succeeding underneath it the whole time. Both times the fix was the
-same: `kubectl delete pod` on the event-handler StatefulSet pod (it comes back
-automatically).
+reasons — version drift, and separately, its own long-lived connection to Teleport simply
+going stale after many hours of uptime (~15h observed) even while `tbot`'s identity renewal
+keeps succeeding underneath it the whole time. Both are now handled automatically by two
+CronJobs, so a human shouldn't need to intervene for either one.
 
-Rather than diagnose *why* every time, `self-heal-cronjob.yaml` just checks "has any audit
-data flowed in the last 20 minutes" (`sum(count_over_time({job="teleport-audit"}[20m]))`
-against Loki) every 10 minutes, and restarts the event-handler pod if not — Slack-notifying
-either way. If it has to restart repeatedly, that's a real signal a human should
-investigate rather than something to suppress, so it doesn't try to avoid re-restarting a
-recently-restarted pod.
+**No-data / connection-staleness (`self-heal-cronjob.yaml`):** checks "has any audit data
+flowed in the last 20 minutes" (`sum(count_over_time({job="teleport-audit"}[20m]))` against
+Loki) every 10 minutes, and restarts the event-handler pod if not — Slack-notifying either
+way. If it has to restart repeatedly, that's a real signal a human should investigate
+rather than something to suppress, so it doesn't try to avoid re-restarting a
+recently-restarted pod. RBAC scoped to `delete` on exactly the one named event-handler pod
+via a dedicated ServiceAccount — it can't touch anything else, including `fluentd` in the
+same namespace.
 
-RBAC for the restart is scoped to `delete` on exactly the one named event-handler pod, via
-a dedicated ServiceAccount — it can't touch anything else, including the `fluentd`
-deployment in the same namespace. The check itself has no `kubectl` binary in its image
-(reuses the same minimal `curlimages/curl` image as `version-drift-check`) — it hits the
-Kubernetes API directly with `curl` using the pod's own mounted ServiceAccount token
-(`/var/run/secrets/kubernetes.io/serviceaccount/{token,ca.crt}`), the same in-cluster auth
+**Version drift (`version-drift-cronjob.yaml`):** on detecting drift, (1) immediately
+patches the live StatefulSet's `tbot`/`event-handler` image tags to the cluster's actual
+version via a strategic-merge-patch and restarts the pod — fixes the pipeline right away,
+independent of step 2 — then (2) clones this repo, bumps both tags in `values.yaml` to
+match, commits, and pushes to `main`, so a future `make upgrade` doesn't silently revert
+the live fix by re-applying the now-stale pinned tag. Step 2 needs a GitHub fine-grained
+PAT scoped to **only this repo**, **Contents: Read and write** permission — nothing
+broader — stored via `make create-github-secret` (never commit this token anywhere). If
+the git sync fails (bad token, network issue, etc.) the live fix still already happened;
+the job just reports the git failure distinctly (visible in `kubectl get jobs` history and
+in the Slack message) rather than silently swallowing it. RBAC scoped to `patch` on
+exactly the one named StatefulSet and `delete` on exactly the one named pod, via its own
+dedicated ServiceAccount, separate from the no-data job's.
+
+Both check scripts hit the Kubernetes API directly with `curl` using the pod's own mounted
+ServiceAccount token (`/var/run/secrets/kubernetes.io/serviceaccount/{token,ca.crt}`), the
+same in-cluster auth
 mechanism `kubectl`/client libraries use internally.
 
 ## Files
@@ -744,7 +762,7 @@ mechanism `kubectl`/client libraries use internally.
 | `helm/teleport-loki/templates/fluentd-deployment.yaml` | Fluentd workload (GEM_HOME fix, tcpSocket probes, PVC buffer) |
 | `helm/teleport-loki/templates/fluentd-buffer-pvc.yaml` | PVC for the Fluentd file buffer (survives restarts) |
 | `helm/teleport-loki/templates/fluentd-service.yaml` | ClusterIP service for Fluentd |
-| `helm/teleport-loki/templates/version-drift-cronjob.yaml` | CronJob comparing cluster version to pinned image tags; Slack-alerts on drift |
+| `helm/teleport-loki/templates/version-drift-cronjob.yaml` | CronJob comparing cluster version to pinned image tags; self-heals by patching the live StatefulSet + committing the fix to values.yaml in git, Slack-notifies either way |
 | `helm/teleport-loki/templates/self-heal-cronjob.yaml` | CronJob checking for audit-pipeline "no data"; auto-restarts event-handler and Slack-notifies |
 | `dashboards/README.md` | Dashboard import instructions and LogQL query reference |
 | `dashboards/teleport-audit-events.json` | Grafana dashboard — general audit event overview |

@@ -9,11 +9,12 @@ LOKI_URL       ?= http://loki-gateway.grafana.svc.cluster.local
 GRAFANA_NS         ?= grafana
 GRAFANA_PASS       ?=
 SLACK_WEBHOOK_URL  ?=
+GITHUB_TOKEN       ?=
 
 -include .env
 
 .PHONY: help setup-certs setup-identity setup-role setup-bot \
-        create-tls-secret create-identity-secret create-slack-secret install upgrade uninstall \
+        create-tls-secret create-identity-secret create-slack-secret create-github-secret install upgrade uninstall \
         import-dashboards import-alerts \
         logs logs-fluentd logs-handler status clean
 
@@ -74,6 +75,20 @@ create-slack-secret: ## Create the Slack webhook secret used by the version-drif
 	kubectl create secret generic teleport-loki-slack \
 	  --namespace $(NAMESPACE) \
 	  --from-literal=url=$(SLACK_WEBHOOK_URL) \
+	  --dry-run=client -o yaml | kubectl apply -f -
+
+create-github-secret: ## Create the GitHub PAT secret used by version-drift-check's self-heal git sync
+	@echo "==> Creating GitHub token secret in namespace $(NAMESPACE) ..."
+	@if [ -z "$(GITHUB_TOKEN)" ]; then \
+	  echo "ERROR: GITHUB_TOKEN is not set. Add it to .env or pass it on the command line."; \
+	  echo "  Create a fine-grained PAT at https://github.com/settings/personal-access-tokens/new"; \
+	  echo "  scoped to ONLY the helm-teleport-loki repo, with Contents: Read and write - nothing else."; \
+	  exit 1; \
+	fi
+	kubectl create namespace $(NAMESPACE) --dry-run=client -o yaml | kubectl apply -f -
+	kubectl create secret generic teleport-loki-github \
+	  --namespace $(NAMESPACE) \
+	  --from-literal=token=$(GITHUB_TOKEN) \
 	  --dry-run=client -o yaml | kubectl apply -f -
 
 setup-bot: ## Create Teleport bot and kubernetes join token (tbot mode — no secret created)
