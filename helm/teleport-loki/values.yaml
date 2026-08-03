@@ -47,7 +47,7 @@ tbot:
   enabled: true
   image:
     repository: public.ecr.aws/gravitational/teleport-distroless
-    tag: "18.10.1"
+    tag: "18.10.3"
     pullPolicy: IfNotPresent
   # -- Name of the Teleport provision token (not a secret — just the token resource name in Teleport)
   joinTokenName: "event-handler-bot-join"
@@ -69,7 +69,7 @@ tbot:
 eventHandler:
   image:
     repository: public.ecr.aws/gravitational/teleport-plugin-event-handler
-    tag: "18.10.1"
+    tag: "18.10.3"
     pullPolicy: IfNotPresent
 
   # -- Number of replicas (keep at 1 — the handler maintains a streaming cursor)
