@@ -248,14 +248,24 @@ emits a `session.summarized` event with a risk assessment).
 | Panel | Type | Query |
 |---|---|---|
 | Total Summaries (24h) | Stat | `... \| event="session.summarized"` |
+| Critical Risk (24h) | Stat | `... \| risk_level="CRITICAL"` — turns dark red if > 0 |
 | High Risk (24h) | Stat | `... \| risk_level="HIGH"` — turns red if > 0 |
 | Medium Risk (24h) | Stat | `... \| risk_level="MEDIUM"` — turns orange if > 0 |
-| Low / Unspecified Risk (24h) | Stat | `... \| risk_level=~"LOW\|UNSPECIFIED"` |
+| Low Risk (24h) | Stat | `... \| risk_level="LOW"` |
+| Unspecified Risk (24h) | Stat | `... \| risk_level="UNSPECIFIED"` |
 | Risk Level Activity Over Time | Timeseries | `sum by (risk_level) (rate(...))` |
 | Summaries by Session Type | Timeseries | `sum by (session_type) (rate(...))` — ssh/kube/db/desktop |
 | Summaries by User | Timeseries | `sum by (username) (rate(...))` |
-| High & Medium Risk Summaries | Logs | Live stream filtered to the risk levels worth reviewing |
+| Critical, High & Medium Risk Summaries | Logs | Live stream filtered to the risk levels worth reviewing |
 | All Session Summaries | Logs | Full stream of every `session.summarized` event |
+
+`risk_level` has 5 possible values — `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`,
+`UNSPECIFIED` — each gets its own stat panel; don't collapse any of them
+into a combined query, since a combined regex panel will silently hide
+whichever value it doesn't explicitly list (this happened here: an
+earlier version only had HIGH/MEDIUM/LOW|UNSPECIFIED panels, so the
+first real `CRITICAL` event didn't show up anywhere except the
+unfiltered "All Session Summaries" log panel).
 
 **Useful ad-hoc queries for Explore:**
 
@@ -264,8 +274,8 @@ emits a `session.summarized` event with a risk assessment).
 {job="teleport-audit"} | json | event="session.summarized"
   | line_format `[{{.risk_level}}] {{.username}} ({{.session_type}}): {{.short_description}}`
 
-# Only sessions flagged medium/high risk
-{job="teleport-audit"} | json | event="session.summarized" | risk_level=~"HIGH|MEDIUM"
+# Only sessions flagged critical/high/medium risk
+{job="teleport-audit"} | json | event="session.summarized" | risk_level=~"CRITICAL|HIGH|MEDIUM"
 
 # Summaries for a specific user
 {job="teleport-audit"} | json | event="session.summarized" | username="steven.oakley"
