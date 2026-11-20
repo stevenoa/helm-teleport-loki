@@ -1,0 +1,254 @@
+{
+  "dashboard": {
+    "title": "Teleport — Session Summaries",
+    "tags": [
+      "teleport",
+      "session-summaries",
+      "audit",
+      "identity-security",
+      "risk"
+    ],
+    "timezone": "browser",
+    "refresh": "30s",
+    "schemaVersion": 38,
+    "panels": [
+      {
+        "id": 1,
+        "title": "Total Summaries (24h)",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+        "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "reduceOptions": { "calcs": ["sum"] }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "thresholds" },
+            "thresholds": { "steps": [ { "color": "blue", "value": null } ] }
+          }
+        },
+        "targets": [
+          {
+            "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+            "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=\"session.summarized\" [$__range]))",
+            "queryType": "instant",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "High Risk (24h)",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+        "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "reduceOptions": { "calcs": ["sum"] }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "thresholds" },
+            "thresholds": {
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "red", "value": 1 }
+              ]
+            }
+          }
+        },
+        "targets": [
+          {
+            "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+            "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=\"session.summarized\" | risk_level=\"HIGH\" [$__range]))",
+            "queryType": "instant",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Medium Risk (24h)",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+        "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "reduceOptions": { "calcs": ["sum"] }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "thresholds" },
+            "thresholds": {
+              "steps": [
+                { "color": "green", "value": null },
+                { "color": "orange", "value": 1 }
+              ]
+            }
+          }
+        },
+        "targets": [
+          {
+            "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+            "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=\"session.summarized\" | risk_level=\"MEDIUM\" [$__range]))",
+            "queryType": "instant",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Low / Unspecified Risk (24h)",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+        "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+        "options": {
+          "colorMode": "background",
+          "graphMode": "none",
+          "reduceOptions": { "calcs": ["sum"] }
+        },
+        "fieldConfig": {
+          "defaults": {
+            "color": { "mode": "thresholds" },
+            "thresholds": { "steps": [ { "color": "blue", "value": null } ] }
+          }
+        },
+        "targets": [
+          {
+            "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+            "expr": "sum(count_over_time({job=\"teleport-audit\"} | json | event=\"session.summarized\" | risk_level=~\"LOW|UNSPECIFIED\" [$__range]))",
+            "queryType": "instant",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Risk Level Activity Over Time",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 24, "x": 0, "y": 4 },
+        "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+        "options": {
+          "legend": { "displayMode": "table", "placement": "right", "calcs": ["sum"] },
+          "tooltip": { "mode": "multi" }
+        },
+        "fieldConfig": {
+          "defaults": { "custom": { "lineWidth": 2, "fillOpacity": 10 } }
+        },
+        "targets": [
+          {
+            "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+            "expr": "sum by (risk_level) (rate({job=\"teleport-audit\"} | json | event=\"session.summarized\" [2m]))",
+            "legendFormat": "{{risk_level}}",
+            "queryType": "range",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Summaries by Session Type",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+        "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+        "options": {
+          "legend": { "displayMode": "list", "placement": "bottom" },
+          "tooltip": { "mode": "multi" }
+        },
+        "fieldConfig": {
+          "defaults": { "custom": { "lineWidth": 2, "fillOpacity": 10 } }
+        },
+        "targets": [
+          {
+            "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+            "expr": "sum by (session_type) (rate({job=\"teleport-audit\"} | json | event=\"session.summarized\" [2m]))",
+            "legendFormat": "{{session_type}}",
+            "queryType": "range",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Summaries by User",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+        "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+        "options": {
+          "legend": { "displayMode": "list", "placement": "bottom" },
+          "tooltip": { "mode": "multi" }
+        },
+        "fieldConfig": {
+          "defaults": { "custom": { "lineWidth": 2, "fillOpacity": 10 } }
+        },
+        "targets": [
+          {
+            "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+            "expr": "sum by (username) (rate({job=\"teleport-audit\"} | json | event=\"session.summarized\" [2m]))",
+            "legendFormat": "{{username}}",
+            "queryType": "range",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "High & Medium Risk Summaries",
+        "type": "logs",
+        "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
+        "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+        "options": {
+          "dedupStrategy": "none",
+          "enableLogDetails": true,
+          "prettifyLogMessage": true,
+          "showCommonLabels": false,
+          "showLabels": false,
+          "showTime": true,
+          "sortOrder": "Descending",
+          "wrapLogMessage": false
+        },
+        "targets": [
+          {
+            "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+            "expr": "{job=\"teleport-audit\"} | json | event=\"session.summarized\" | risk_level=~\"HIGH|MEDIUM\"",
+            "queryType": "range",
+            "refId": "A"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "All Session Summaries",
+        "type": "logs",
+        "gridPos": { "h": 10, "w": 24, "x": 0, "y": 28 },
+        "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+        "options": {
+          "dedupStrategy": "none",
+          "enableLogDetails": true,
+          "prettifyLogMessage": true,
+          "showCommonLabels": false,
+          "showLabels": false,
+          "showTime": true,
+          "sortOrder": "Descending",
+          "wrapLogMessage": false
+        },
+        "targets": [
+          {
+            "datasource": { "type": "loki", "uid": "afqc1lplux9fka" },
+            "expr": "{job=\"teleport-audit\"} | json | event=\"session.summarized\"",
+            "queryType": "range",
+            "refId": "A"
+          }
+        ]
+      }
+    ],
+    "time": { "from": "now-24h", "to": "now" },
+    "timepicker": {}
+  },
+  "overwrite": true,
+  "folderId": 0
+}

@@ -135,6 +135,10 @@ eventHandler:
     # Windows Desktop
     - windows_desktop.session.start
     - windows_desktop.session.end
+    # AI session summaries (Identity Security / Session Summaries feature) -
+    # risk_level/session_type/short_description fields power the
+    # teleport-session-summaries dashboard.
+    - session.summarized
     # Security controls
     - lock.create
     - lock.delete

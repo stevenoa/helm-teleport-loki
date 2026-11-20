@@ -11,6 +11,7 @@ Pre-built Grafana dashboards for Teleport audit events stored in Grafana Loki.
 | `teleport-access-requests.json` | Teleport — Access Requests | JIT access request lifecycle — created, approved, denied — by requester and reviewer |
 | `teleport-identity-changes.json` | Teleport — Identity Changes | Role, user, lock, connector, and trusted cluster changes — all turns red on any activity |
 | `teleport-nginx-k8s-demo.json` | Teleport — Nginx K8s Access Demo | `kube.request` events for the `gitlab-nginx-ci` bot only — restart-only traffic to `nginx-prod1` vs. full-access traffic to `demo-nginx` |
+| `teleport-session-summaries.json` | Teleport — Session Summaries | AI-generated session summaries (Identity Security) — risk level breakdown (high/medium/low), by session type and user, full log stream |
 
 ## Importing dashboards
 
@@ -232,6 +233,55 @@ from the default event-handler `types` allow-list as noise (see the
 comment in `values.yaml`). It was deliberately re-added specifically to
 support this dashboard; watch Loki ingest volume if that becomes a
 problem at scale.
+
+---
+
+### Teleport — Session Summaries (`teleport-session-summaries.json`)
+
+Tracks Teleport's AI-generated session summaries (the Identity Security
+"Session Summaries" feature — `inference_model`/`inference_policy`
+resources route SSH/Kubernetes/database/desktop sessions to an LLM, which
+emits a `session.summarized` event with a risk assessment).
+
+**Panels:**
+
+| Panel | Type | Query |
+|---|---|---|
+| Total Summaries (24h) | Stat | `... \| event="session.summarized"` |
+| High Risk (24h) | Stat | `... \| risk_level="HIGH"` — turns red if > 0 |
+| Medium Risk (24h) | Stat | `... \| risk_level="MEDIUM"` — turns orange if > 0 |
+| Low / Unspecified Risk (24h) | Stat | `... \| risk_level=~"LOW\|UNSPECIFIED"` |
+| Risk Level Activity Over Time | Timeseries | `sum by (risk_level) (rate(...))` |
+| Summaries by Session Type | Timeseries | `sum by (session_type) (rate(...))` — ssh/kube/db/desktop |
+| Summaries by User | Timeseries | `sum by (username) (rate(...))` |
+| High & Medium Risk Summaries | Logs | Live stream filtered to the risk levels worth reviewing |
+| All Session Summaries | Logs | Full stream of every `session.summarized` event |
+
+**Useful ad-hoc queries for Explore:**
+
+```logql
+# All session summaries with their risk level and short description
+{job="teleport-audit"} | json | event="session.summarized"
+  | line_format `[{{.risk_level}}] {{.username}} ({{.session_type}}): {{.short_description}}`
+
+# Only sessions flagged medium/high risk
+{job="teleport-audit"} | json | event="session.summarized" | risk_level=~"HIGH|MEDIUM"
+
+# Summaries for a specific user
+{job="teleport-audit"} | json | event="session.summarized" | username="steven.oakley"
+
+# Desktop session summaries only
+{job="teleport-audit"} | json | event="session.summarized" | session_type="desktop"
+```
+
+**Gotcha:** `session.summarized` is **not** in the event-handler's default
+`types` allow-list — like `kube.request`, it has to be explicitly added
+(see the comment in `values.yaml`) or no summaries ever reach Loki
+regardless of whether Session Summaries itself is working in Teleport.
+Adding the type only affects events going forward; it does not backfill
+summaries emitted before the event-handler picked up the new type,
+since its cursor is a forward-only position on the audit log, not a
+historical re-scan.
 
 ---
 
